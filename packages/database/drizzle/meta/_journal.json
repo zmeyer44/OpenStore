@@ -15,6 +15,20 @@
       "when": 1775015162419,
       "tag": "0001_certain_mockingbird",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775052407430,
+      "tag": "0002_awesome_eddie_brock",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1775053425414,
+      "tag": "0003_damp_wrecking_crew",
+      "breakpoints": true
     }
   ]
 }

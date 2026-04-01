@@ -10,6 +10,7 @@ import {
   ChevronsUpDown,
   Settings,
   Users,
+  Key,
 } from 'lucide-react';
 import { signOut } from '@/lib/auth/client';
 import { trpc } from '@/lib/trpc/client';
@@ -63,6 +64,7 @@ export function AppSidebar({
   const settingsItems = [
     { href: `${prefix}/settings`, label: 'Settings', icon: Settings, key: 'settings' },
     { href: `${prefix}/settings/members`, label: 'Members', icon: Users, key: 'members' },
+    { href: `${prefix}/settings/api-keys`, label: 'API Keys', icon: Key, key: 'api-keys' },
   ];
 
   const initials = user.name

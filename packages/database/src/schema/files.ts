@@ -33,6 +33,7 @@ export const files = pgTable(
     status: varchar('status', { length: 20 }).notNull().default('ready'),
     thumbnailPath: text('thumbnail_path'),
     checksum: varchar('checksum', { length: 128 }),
+    s3Key: text('s3_key'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -41,6 +42,7 @@ export const files = pgTable(
     index('files_user_id_idx').on(table.userId),
     index('files_folder_id_idx').on(table.folderId),
     index('files_workspace_folder_idx').on(table.workspaceId, table.folderId),
+    index('files_workspace_s3key_idx').on(table.workspaceId, table.s3Key),
   ],
 );
 
