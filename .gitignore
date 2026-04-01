@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build outputs
+dist/
+.next/
+.turbo/
+out/
+
+# environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# testing
+coverage/
+e2e/test-results/
+e2e/report/
+e2e/.auth/
+
+# local blob storage
+local-blobs/
+
+# claude code
+.claude/worktrees/
+
+# misc
+*.log
+*.tsbuildinfo
