@@ -535,6 +535,9 @@ export const optimizedGrepCommand = defineCommand(
 
     // If no targets, read from stdin
     if (targets.length === 0) {
+      if (!ctx.stdin) {
+        return { stdout: "", stderr: "", exitCode: 1 };
+      }
       const matches = grepContent(
         "(standard input)",
         ctx.stdin,

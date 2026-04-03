@@ -462,6 +462,11 @@ async function buildWorkspaceSnapshot(params: {
   };
 }
 
+// Tracks which builds were started before the most recent invalidation.
+// When a build completes, it only populates the cache if its generation
+// matches the current generation, preventing stale data after invalidation.
+const snapshotGeneration = new Map<string, number>();
+
 async function getWorkspaceSnapshot(params: {
   db: Database;
   workspaceId: string;
@@ -477,12 +482,16 @@ async function getWorkspaceSnapshot(params: {
     return pending;
   }
 
+  const generation = (snapshotGeneration.get(params.workspaceId) ?? 0);
   const buildPromise = buildWorkspaceSnapshot(params)
     .then((snapshot) => {
-      snapshotCache.set(params.workspaceId, {
-        snapshot,
-        expiresAt: Date.now() + TREE_CACHE_TTL_MS,
-      });
+      // Only cache if no invalidation occurred since this build started
+      if ((snapshotGeneration.get(params.workspaceId) ?? 0) === generation) {
+        snapshotCache.set(params.workspaceId, {
+          snapshot,
+          expiresAt: Date.now() + TREE_CACHE_TTL_MS,
+        });
+      }
       return snapshot;
     })
     .finally(() => {
@@ -495,6 +504,8 @@ async function getWorkspaceSnapshot(params: {
 
 export function invalidateWorkspaceVfsSnapshot(workspaceId: string): void {
   snapshotCache.delete(workspaceId);
+  pendingSnapshotBuilds.delete(workspaceId);
+  snapshotGeneration.set(workspaceId, (snapshotGeneration.get(workspaceId) ?? 0) + 1);
 }
 
 export class OpenStoreVirtualFileSystem implements IFileSystem {

@@ -43,6 +43,13 @@
       "when": 1775166427743,
       "tag": "0005_flaky_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1775223897365,
+      "tag": "0006_slim_nick_fury",
+      "breakpoints": true
     }
   ]
 }

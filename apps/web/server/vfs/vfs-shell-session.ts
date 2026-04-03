@@ -35,6 +35,7 @@ interface VfsShellSession {
 const sessionsById = new Map<string, VfsShellSession>();
 
 const PRUNE_THROTTLE_MS = 30_000;
+const MAX_SESSIONS_PER_WORKSPACE = 20;
 let lastPruneAt = 0;
 
 function readPositiveInt(value: string | undefined, fallback: number): number {
@@ -56,6 +57,24 @@ function pruneExpiredSessions(): void {
     if (getSessionExpiryTime(session) <= now) {
       sessionsById.delete(sessionId);
     }
+  }
+}
+
+function enforceWorkspaceSessionCap(workspaceId: string): void {
+  const workspaceSessions: VfsShellSession[] = [];
+  for (const session of sessionsById.values()) {
+    if (session.workspaceId === workspaceId) {
+      workspaceSessions.push(session);
+    }
+  }
+
+  if (workspaceSessions.length < MAX_SESSIONS_PER_WORKSPACE) return;
+
+  // Evict oldest sessions until under the cap
+  workspaceSessions.sort((a, b) => a.lastUsedAt - b.lastUsedAt);
+  const toEvict = workspaceSessions.length - MAX_SESSIONS_PER_WORKSPACE + 1;
+  for (let i = 0; i < toEvict; i++) {
+    sessionsById.delete(workspaceSessions[i]!.id);
   }
 }
 
@@ -128,6 +147,7 @@ export async function createVfsShellSession(params: {
   cwd?: string;
 }): Promise<{ sessionId: string; cwd: string; expiresAt: Date }> {
   pruneExpiredSessions();
+  enforceWorkspaceSessionCap(params.workspaceId);
 
   const fs = await OpenStoreVirtualFileSystem.create({
     db: params.db,

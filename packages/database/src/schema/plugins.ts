@@ -24,8 +24,7 @@ export const pluginRegistryEntries = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: 'cascade' }),
     createdById: text('created_by_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+      .references(() => users.id, { onDelete: 'set null' }),
     slug: varchar('slug', { length: 80 }).notNull(),
     manifest: jsonb('manifest').$type<PluginManifest>().notNull(),
     source: varchar('source', { length: 20 }).notNull().default('inhouse'),
@@ -50,8 +49,7 @@ export const workspacePlugins = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: 'cascade' }),
     installedById: text('installed_by_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+      .references(() => users.id, { onDelete: 'set null' }),
     pluginSlug: varchar('plugin_slug', { length: 80 }).notNull(),
     source: varchar('source', { length: 20 }).notNull(),
     manifest: jsonb('manifest').$type<PluginManifest>().notNull(),
@@ -104,8 +102,7 @@ export const pluginInvocationLogs = pgTable(
       .notNull()
       .references(() => workspacePlugins.id, { onDelete: 'cascade' }),
     actorUserId: text('actor_user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+      .references(() => users.id, { onDelete: 'set null' }),
     actionId: varchar('action_id', { length: 120 }).notNull(),
     targetType: varchar('target_type', { length: 20 }),
     targetId: uuid('target_id'),

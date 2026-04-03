@@ -83,12 +83,15 @@ export const qmdClient = {
   }): Promise<void> {
     if (!QMD_SERVICE_URL) return;
 
-    await fetch(`${QMD_SERVICE_URL}/index`, {
+    const res = await fetch(`${QMD_SERVICE_URL}/index`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(params),
       signal: AbortSignal.timeout(30_000),
     });
+    if (!res.ok) {
+      console.error(`[qmd-client] indexFile failed: ${res.status} ${res.statusText}`);
+    }
   },
 
   async search(params: {
