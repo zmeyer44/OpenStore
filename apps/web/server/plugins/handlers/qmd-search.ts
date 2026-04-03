@@ -95,13 +95,14 @@ export const qmdSearchHandler: PluginHandler = {
     const query = params.query.trim().toLowerCase();
     const tokens = query.split(/\s+/).filter(Boolean);
 
+    const escapedQuery = query.replace(/[%_\\]/g, '\\$&');
     const rows = await ctx.db
       .select({ id: files.id, name: files.name })
       .from(files)
       .where(
         and(
           eq(files.workspaceId, ctx.workspaceId),
-          ilike(files.name, `%${params.query}%`),
+          ilike(files.name, `%${escapedQuery}%`),
         ),
       )
       .limit(params.limit ?? 50);

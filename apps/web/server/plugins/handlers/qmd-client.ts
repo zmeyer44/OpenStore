@@ -7,20 +7,17 @@ const QMD_API_SECRET = process.env.QMD_API_SECRET;
 
 const MAX_CONTENT_SIZE = 10 * 1024 * 1024; // 10MB — skip files larger than this
 
-const NON_INDEXABLE_PREFIXES = ['image/', 'video/', 'audio/'];
-const NON_INDEXABLE_TYPES = new Set([
-  'application/zip',
-  'application/gzip',
-  'application/x-tar',
-  'application/x-7z-compressed',
-  'application/x-rar-compressed',
-  'application/octet-stream',
+const INDEXABLE_PREFIXES = ['text/'];
+const INDEXABLE_TYPES = new Set([
+  'application/json',
+  'application/xml',
+  'application/javascript',
+  'application/typescript',
 ]);
 
 function shouldIndex(mimeType: string): boolean {
-  if (NON_INDEXABLE_PREFIXES.some((p) => mimeType.startsWith(p))) return false;
-  if (NON_INDEXABLE_TYPES.has(mimeType)) return false;
-  return true;
+  if (INDEXABLE_PREFIXES.some((p) => mimeType.startsWith(p))) return true;
+  return INDEXABLE_TYPES.has(mimeType);
 }
 
 function authHeaders(): Record<string, string> {

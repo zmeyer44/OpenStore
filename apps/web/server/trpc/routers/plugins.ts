@@ -342,8 +342,8 @@ export const pluginsRouter = createRouter({
           workspaceId: ctx.workspaceId,
           createdById: ctx.userId,
           slug: manifest.slug,
-          manifest,
-          source: manifest.source,
+          manifest: { ...manifest, source: 'inhouse' },
+          source: 'inhouse',
           isActive: true,
         })
         .onConflictDoUpdate({
@@ -352,8 +352,8 @@ export const pluginsRouter = createRouter({
             pluginRegistryEntries.slug,
           ],
           set: {
-            manifest,
-            source: manifest.source,
+            manifest: { ...manifest, source: 'inhouse' },
+            source: 'inhouse',
             isActive: true,
             updatedAt: new Date(),
           },
