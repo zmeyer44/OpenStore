@@ -14,6 +14,7 @@ import {
   BarChart3,
   Puzzle,
 } from 'lucide-react';
+import { Logo } from '@/assets/logo';
 import { signOut } from '@/lib/auth/client';
 import { trpc } from '@/lib/trpc/client';
 import { WorkspaceSwitcher } from './workspace-switcher';
@@ -90,9 +91,7 @@ export function AppSidebar({
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild>
                 <Link href="/">
-                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-semibold text-sm">
-                    O
-                  </div>
+                  <Logo className="size-8 text-primary" />
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-semibold">OpenStore</span>
                     <span className="truncate text-xs text-muted-foreground">

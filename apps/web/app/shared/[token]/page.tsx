@@ -2,13 +2,13 @@
 
 import { useState, use } from 'react';
 import {
-  HardDrive,
   Download,
   Lock,
   AlertCircle,
   FileText,
   Folder,
 } from 'lucide-react';
+import { Logo } from '@/assets/logo';
 import { trpc } from '@/lib/trpc/client';
 import { formatBytes } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -61,7 +61,7 @@ export default function SharedPage({
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-full max-w-sm rounded-lg border bg-card p-6">
           <div className="flex items-center gap-2 mb-6">
-            <HardDrive className="size-5 text-primary" />
+            <Logo className="size-5 text-primary" />
             <span className="title text-base">OpenStore</span>
           </div>
 

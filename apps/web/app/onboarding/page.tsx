@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { HardDrive, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { Logo } from '@/assets/logo';
 import { trpc } from '@/lib/trpc/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,9 +33,7 @@ export default function OnboardingPage() {
       <div className="w-full max-w-sm">
         <div className="rounded-lg border bg-card p-6 shadow-sm">
           <div className="flex items-center gap-2 mb-6">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <HardDrive className="size-4" />
-            </div>
+            <Logo className="size-8 text-primary" />
             <span className="text-lg font-semibold">OpenStore</span>
           </div>
 

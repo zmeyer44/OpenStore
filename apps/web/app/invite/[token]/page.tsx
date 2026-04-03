@@ -2,7 +2,8 @@
 
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
-import { HardDrive, Loader2, Users, AlertCircle } from 'lucide-react';
+import { Loader2, Users, AlertCircle } from 'lucide-react';
+import { Logo } from '@/assets/logo';
 import { trpc } from '@/lib/trpc/client';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -72,9 +73,7 @@ export default function InvitePage({
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-sm rounded-lg border bg-card p-6">
         <div className="flex items-center gap-2 mb-6">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <HardDrive className="size-4" />
-          </div>
+          <Logo className="size-8 text-primary" />
           <span className="text-lg font-semibold">OpenStore</span>
         </div>
 

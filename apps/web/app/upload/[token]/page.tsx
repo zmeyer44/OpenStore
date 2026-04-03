@@ -3,7 +3,6 @@
 import { useState, useCallback, use } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
-  HardDrive,
   Upload,
   Lock,
   AlertCircle,
@@ -11,6 +10,7 @@ import {
   Loader2,
   X,
 } from 'lucide-react';
+import { Logo } from '@/assets/logo';
 import { trpc } from '@/lib/trpc/client';
 import { cn, formatBytes } from '@/lib/utils';
 import { FileIcon } from '@/components/file-icon';
@@ -129,7 +129,7 @@ export default function PublicUploadPage({
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-full max-w-sm rounded-lg border bg-card p-6">
           <div className="flex items-center gap-2 mb-6">
-            <HardDrive className="size-5 text-primary" />
+            <Logo className="size-5 text-primary" />
             <span className="title text-base">OpenStore</span>
           </div>
           <Lock className="h-8 w-8 text-muted-foreground/50 mb-3" />
