@@ -9,7 +9,14 @@ export const contentType = "image/png";
 const PRIMARY = "#4F46E5";
 
 export default async function Image() {
-  const geistDir = join(require.resolve("geist/font/sans"), "../../dist/fonts");
+  const { createRequire } = await import(
+    /* webpackIgnore: true */ "node:module"
+  );
+  const nodeRequire = createRequire(join(process.cwd(), "package.json"));
+  const geistDir = join(
+    nodeRequire.resolve("geist/font/sans"),
+    "../../dist/fonts",
+  );
   const [geistRegular, geistMedium, geistMonoBold] = await Promise.all([
     readFile(join(geistDir, "geist-sans/Geist-Regular.ttf")),
     readFile(join(geistDir, "geist-sans/Geist-Medium.ttf")),
