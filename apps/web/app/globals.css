@@ -118,6 +118,17 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+@keyframes commandSearchIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

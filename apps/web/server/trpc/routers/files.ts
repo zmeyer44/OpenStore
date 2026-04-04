@@ -122,6 +122,73 @@ export const filesRouter = createRouter({
       };
     }),
 
+  search: workspaceProcedure
+    .input(z.object({ query: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const { db } = ctx;
+      const { query } = input;
+
+      const ftsMap = new Map<string, { snippet?: string; score: number }>();
+
+      if (ftsClient.isConfigured()) {
+        try {
+          if (await ftsClient.isActiveForWorkspace(db, ctx.workspaceId)) {
+            const ftsResults = await ftsClient.search({
+              workspaceId: ctx.workspaceId,
+              query,
+              limit: 20,
+            });
+            for (const r of ftsResults) {
+              ftsMap.set(r.fileId, { snippet: r.snippet, score: r.score });
+            }
+          }
+        } catch {}
+      }
+
+      const nameMatches = await db
+        .select()
+        .from(files)
+        .where(
+          and(
+            eq(files.workspaceId, ctx.workspaceId),
+            ilike(files.name, `%${query}%`),
+          ),
+        )
+        .limit(20);
+
+      const nameIds = new Set(nameMatches.map((f) => f.id));
+      const ftsOnlyIds = [...ftsMap.keys()].filter((id) => !nameIds.has(id));
+
+      let ftsOnlyFiles: typeof nameMatches = [];
+      if (ftsOnlyIds.length > 0) {
+        ftsOnlyFiles = await db
+          .select()
+          .from(files)
+          .where(
+            and(
+              eq(files.workspaceId, ctx.workspaceId),
+              inArray(files.id, ftsOnlyIds),
+            ),
+          );
+      }
+
+      const allFiles = [...nameMatches, ...ftsOnlyFiles];
+      const results = allFiles.map((f) => ({
+        ...f,
+        snippet: ftsMap.get(f.id)?.snippet ?? null,
+        ftsScore: ftsMap.get(f.id)?.score ?? null,
+      }));
+
+      results.sort((a, b) => {
+        if (a.ftsScore && !b.ftsScore) return -1;
+        if (!a.ftsScore && b.ftsScore) return 1;
+        if (a.ftsScore && b.ftsScore) return b.ftsScore - a.ftsScore;
+        return a.name.localeCompare(b.name);
+      });
+
+      return results.slice(0, 20);
+    }),
+
   get: workspaceProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {

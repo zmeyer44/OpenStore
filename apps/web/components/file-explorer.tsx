@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   FolderPlus,
   Upload,
-  Search,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -20,7 +19,6 @@ import { trpc } from "@/lib/trpc/client";
 import { formatBytes, formatDate } from "@/lib/utils";
 import { FileIcon } from "@/components/file-icon";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +33,7 @@ import { ShareDialog } from "@/components/share-dialog";
 import { CreateTrackedLinkDialog } from "@/components/create-tracked-link-dialog";
 import { DroppableFolderRow } from "@/components/file-explorer/droppable-folder-row";
 import { DraggableFileRow } from "@/components/file-explorer/draggable-file-row";
+import { CommandSearch } from "@/components/command-search";
 import { DesktopDropOverlay } from "@/components/desktop-drop-overlay";
 import { useFileDrop } from "@/hooks/use-file-drop";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -46,15 +45,6 @@ const ROW_GRID =
 export function FileExplorer({ folderId }: { folderId: string | null }) {
   const router = useRouter();
   const workspace = useWorkspace();
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  useEffect(() => {
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setSearch(searchInput), 350);
-    return () => clearTimeout(debounceRef.current);
-  }, [searchInput]);
   const [showUpload, setShowUpload] = useState(false);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [droppedFiles, setDroppedFiles] = useState<File[] | undefined>(
@@ -89,7 +79,6 @@ export function FileExplorer({ folderId }: { folderId: string | null }) {
 
   const { data: fileList } = trpc.files.list.useQuery({
     folderId,
-    search: search || undefined,
     page: 1,
     pageSize: 100,
     field: "name",
@@ -175,7 +164,7 @@ export function FileExplorer({ folderId }: { folderId: string | null }) {
 
   const folders = folderList ?? [];
   const files = fileList?.items ?? [];
-  const isEmpty = folders.length === 0 && files.length === 0 && !searchInput;
+  const isEmpty = folders.length === 0 && files.length === 0;
 
   return (
     <div>
@@ -207,6 +196,7 @@ export function FileExplorer({ folderId }: { folderId: string | null }) {
         </div>
 
         <div className="flex items-center gap-2 px-4">
+          <CommandSearch />
           <Button
             variant="outline"
             size="sm"
@@ -224,19 +214,6 @@ export function FileExplorer({ folderId }: { folderId: string | null }) {
 
       {/* Content */}
       <div className="p-6">
-        {/* Search bar */}
-        <div className="mb-4">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Search files..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-9 h-8"
-            />
-          </div>
-        </div>
-
         {/* File List */}
         {isEmpty ? (
           <div className="rounded-lg border bg-card flex flex-col items-center justify-center py-20 text-center">
