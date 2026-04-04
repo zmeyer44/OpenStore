@@ -36,72 +36,66 @@ export default function RegisterPage() {
   };
 
   return (
-   
-      <div className="w-full max-w-sm">
-        <div className="rounded-lg border bg-card p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-6">
-            <Logo className="size-8 text-primary" />
-            <span className="text-lg font-semibold">Locker</span>
+    <div className="w-full max-w-sm">
+      <div className="rounded-lg border bg-card p-6 shadow-sm">
+        <div className="flex items-center gap-2 mb-6">
+          <Logo className="size-8 text-primary" />
+          <span className="text-lg font-semibold">Locker</span>
+        </div>
+
+        <h1 className="text-xl font-semibold tracking-tight mb-1">
+          Create account
+        </h1>
+        <p className="text-sm text-muted-foreground mb-6">
+          Start storing your files securely
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Name</label>
+            <Input
+              placeholder="Your name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
           </div>
 
-          <h1 className="text-xl font-semibold tracking-tight mb-1">
-            Create account
-          </h1>
-          <p className="text-sm text-muted-foreground mb-6">
-            Start storing your files securely
-          </p>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Email</label>
+            <Input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Name</label>
-              <Input
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Password</label>
+            <Input
+              type="password"
+              placeholder="Choose a password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+            />
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Email</label>
-              <Input
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? <Loader2 className="animate-spin" /> : "Create account"}
+          </Button>
+        </form>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Password</label>
-              <Input
-                type="password"
-                placeholder="Choose a password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-              />
-            </div>
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                "Create account"
-              )}
-            </Button>
-          </form>
-
-          <p className="text-sm text-muted-foreground text-center mt-4">
-            Already have an account?{" "}
-            <Link href="/login" className="text-primary hover:underline">
-              Sign in
-            </Link>
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground text-center mt-4">
+          Already have an account?{" "}
+          <Link href="/login" className="text-primary hover:underline">
+            Sign in
+          </Link>
+        </p>
       </div>
-   
+    </div>
   );
 }
