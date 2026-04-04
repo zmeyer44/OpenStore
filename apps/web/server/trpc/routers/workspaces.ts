@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { eq, and } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
 import { createRouter, protectedProcedure, workspaceProcedure, workspaceAdminProcedure } from '../init';
-import { workspaces, workspaceMembers } from '@openstore/database';
-import { createWorkspaceSchema, updateWorkspaceSchema, generateSlug } from '@openstore/common';
+import { workspaces, workspaceMembers } from '@locker/database';
+import { createWorkspaceSchema, updateWorkspaceSchema, generateSlug } from '@locker/common';
 
 export const workspacesRouter = createRouter({
   list: protectedProcedure.query(async ({ ctx }) => {

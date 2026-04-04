@@ -8,7 +8,7 @@ import {
   pluginRegistryEntries,
   workspacePlugins,
   workspacePluginSecrets,
-} from '@openstore/database';
+} from '@locker/database';
 import {
   installWorkspacePluginSchema,
   listPluginActionsSchema,
@@ -20,7 +20,7 @@ import {
   type PluginPermission,
   type PluginStatus,
   updateWorkspacePluginConfigSchema,
-} from '@openstore/common';
+} from '@locker/common';
 import { createRouter, workspaceProcedure, workspaceAdminProcedure } from '../init';
 import { getBuiltinPluginBySlug, getBuiltinPluginCatalog } from '../../plugins/catalog';
 import { encryptPluginSecret } from '../../plugins/secrets';
@@ -124,7 +124,7 @@ function missingRequiredConfigFields(params: {
 }
 
 async function loadWorkspaceCatalog(
-  db: ReturnType<typeof import('@openstore/database/client').getDb>,
+  db: ReturnType<typeof import('@locker/database/client').getDb>,
   workspaceId: string,
 ): Promise<PluginManifest[]> {
   const builtinCatalog = getBuiltinPluginCatalog();
@@ -161,7 +161,7 @@ async function loadWorkspaceCatalog(
 }
 
 async function getConfiguredSecretKeysByPlugin(
-  db: ReturnType<typeof import('@openstore/database/client').getDb>,
+  db: ReturnType<typeof import('@locker/database/client').getDb>,
   workspacePluginIds: string[],
 ): Promise<Map<string, Set<string>>> {
   const secretKeyMap = new Map<string, Set<string>>();
@@ -186,7 +186,7 @@ async function getConfiguredSecretKeysByPlugin(
 }
 
 async function resolvePluginTarget(params: {
-  db: ReturnType<typeof import('@openstore/database/client').getDb>;
+  db: ReturnType<typeof import('@locker/database/client').getDb>;
   workspaceId: string;
   target: 'file' | 'folder' | 'workspace';
   targetId: string;

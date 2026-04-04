@@ -10,7 +10,7 @@ import {
   Presentation,
   Folder,
 } from 'lucide-react';
-import { getFileCategory } from '@openstore/common';
+import { getFileCategory } from '@locker/common';
 import { cn } from '@/lib/utils';
 import { getFileExtension } from '@/lib/utils';
 

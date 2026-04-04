@@ -2,8 +2,8 @@ import { z } from "zod";
 import { eq, and, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { createRouter, workspaceProcedure, publicProcedure } from "../init";
-import { shareLinks, files, folders } from "@openstore/database";
-import { createShareLinkSchema, SHARE_TOKEN_LENGTH } from "@openstore/common";
+import { shareLinks, files, folders } from "@locker/database";
+import { createShareLinkSchema, SHARE_TOKEN_LENGTH } from "@locker/common";
 import { createStorageForFile } from "../../../server/storage";
 import { hashLinkPassword, verifyLinkPassword } from "../../security/password";
 

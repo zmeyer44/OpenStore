@@ -1,9 +1,9 @@
 import { createHmac, createHash, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
-import { getDb } from '@openstore/database/client';
-import { s3ApiKeys, workspaces } from '@openstore/database';
+import { getDb } from '@locker/database/client';
+import { s3ApiKeys, workspaces } from '@locker/database';
 import { eq, and } from 'drizzle-orm';
 
-const ACCESS_KEY_PREFIX = 'OSAK';
+const ACCESS_KEY_PREFIX = 'LKAK';
 const ACCESS_KEY_LENGTH = 20;
 const SECRET_KEY_BYTES = 40;
 const ALGORITHM = 'aes-256-gcm';

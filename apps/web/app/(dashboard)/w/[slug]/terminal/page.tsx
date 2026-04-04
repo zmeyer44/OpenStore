@@ -213,7 +213,7 @@ export default function TerminalPage() {
       >
         {/* Welcome message */}
         <div className="text-zinc-500 mb-4">
-          OpenStore Shell — {workspace.name}
+          Locker Shell — {workspace.name}
           {"\n"}Type commands to explore your workspace files. This is a
           read-only shell.
         </div>

@@ -39,7 +39,7 @@ export class S3StorageAdapter implements StorageProvider {
       requestChecksumCalculation: "WHEN_REQUIRED",
       responseChecksumValidation: "WHEN_REQUIRED",
     });
-    this.bucket = config?.bucket ?? process.env.S3_BUCKET ?? "openstore";
+    this.bucket = config?.bucket ?? process.env.S3_BUCKET ?? "locker";
   }
 
   async upload(params: {

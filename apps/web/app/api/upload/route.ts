@@ -1,27 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../server/auth";
 import { headers } from "next/headers";
-import { getDb } from "@openstore/database/client";
-import {
-  files,
-  folders,
-  workspaces,
-  workspaceMembers,
-} from "@openstore/database";
+import { getDb } from "@locker/database/client";
+import { files, folders, workspaces, workspaceMembers } from "@locker/database";
 import {
   createStorageForWorkspace,
   createStorageForFile,
   shouldEnforceQuota,
   shouldEnforceQuotaForConfig,
 } from "../../../server/storage";
-import { MAX_FILE_SIZE } from "@openstore/common";
+import { MAX_FILE_SIZE } from "@locker/common";
 import { eq, and, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import {
   qmdClient,
   streamToString,
 } from "../../../server/plugins/handlers/qmd-client";
-import { invalidateWorkspaceVfsSnapshot } from "../../../server/vfs/openstore-vfs";
+import { invalidateWorkspaceVfsSnapshot } from "../../../server/vfs/locker-vfs";
 
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() });

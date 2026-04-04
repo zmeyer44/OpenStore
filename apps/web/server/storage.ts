@@ -1,12 +1,12 @@
 import { eq, and } from "drizzle-orm";
-import { getDb } from "@openstore/database/client";
-import { workspaceStorageConfigs } from "@openstore/database";
+import { getDb } from "@locker/database/client";
+import { workspaceStorageConfigs } from "@locker/database";
 import {
   createStorage,
   createStorageFromConfig,
   type StorageProvider,
   type WorkspaceStorageConfig,
-} from "@openstore/storage";
+} from "@locker/storage";
 import { decryptSecret } from "./s3/auth";
 
 // ── Internal helpers ────────────────────────────────────────────────────

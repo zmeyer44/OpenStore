@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { createRouter, workspaceAdminProcedure } from '../init';
-import { s3ApiKeys } from '@openstore/database';
+import { s3ApiKeys } from '@locker/database';
 import {
   generateAccessKeyId,
   generateSecretKey,

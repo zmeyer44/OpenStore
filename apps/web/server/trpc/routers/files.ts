@@ -1,17 +1,17 @@
 import { z } from "zod";
 import { eq, and, asc, desc, isNull, sql, ilike } from "drizzle-orm";
 import { createRouter, workspaceProcedure } from "../init";
-import { files, workspaces, folders } from "@openstore/database";
+import { files, workspaces, folders } from "@locker/database";
 import { createStorageForFile } from "../../../server/storage";
 import {
   renameFileSchema,
   moveItemSchema,
   paginationSchema,
   sortSchema,
-} from "@openstore/common";
+} from "@locker/common";
 import { enhanceSearchResultsWithPlugins } from "../../plugins/search";
 import { qmdClient } from "../../plugins/handlers/qmd-client";
-import { invalidateWorkspaceVfsSnapshot } from "../../vfs/openstore-vfs";
+import { invalidateWorkspaceVfsSnapshot } from "../../vfs/locker-vfs";
 
 export const filesRouter = createRouter({
   list: workspaceProcedure

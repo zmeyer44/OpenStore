@@ -7,12 +7,12 @@ import {
   trackedLinkEvents,
   files,
   folders,
-} from "@openstore/database";
+} from "@locker/database";
 import {
   createTrackedLinkSchema,
   updateTrackedLinkSchema,
-} from "@openstore/common";
-import { TRACKED_LINK_TOKEN_LENGTH } from "@openstore/common";
+} from "@locker/common";
+import { TRACKED_LINK_TOKEN_LENGTH } from "@locker/common";
 import { createStorageForFile } from "../../../server/storage";
 import { hashLinkPassword, verifyLinkPassword } from "../../security/password";
 

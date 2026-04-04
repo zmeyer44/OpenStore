@@ -1,6 +1,6 @@
-import type { Database } from '@openstore/database';
-import type { StorageProvider } from '@openstore/storage';
-import type { PluginManifest } from '@openstore/common';
+import type { Database } from '@locker/database';
+import type { StorageProvider } from '@locker/storage';
+import type { PluginManifest } from '@locker/common';
 
 /** Scoped context passed to every plugin handler invocation. */
 export interface PluginContext {

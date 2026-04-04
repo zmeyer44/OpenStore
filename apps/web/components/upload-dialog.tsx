@@ -18,7 +18,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { MAX_FILE_SIZE } from "@openstore/common";
+import { MAX_FILE_SIZE } from "@locker/common";
 
 interface UploadFileEntry {
   file: File;

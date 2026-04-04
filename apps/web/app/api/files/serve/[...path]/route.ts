@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { verifyLocalFileSignature } from "@openstore/storage";
+import { verifyLocalFileSignature } from "@locker/storage";
 import { createStorageForFile } from "../../../../../server/storage";
-import { getDb } from "@openstore/database/client";
-import { files } from "@openstore/database";
+import { getDb } from "@locker/database/client";
+import { files } from "@locker/database";
 import { eq } from "drizzle-orm";
 
 export const runtime = "nodejs";

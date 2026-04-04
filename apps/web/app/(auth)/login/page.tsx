@@ -1,19 +1,19 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
-import { Logo } from '@/assets/logo';
-import { signIn } from '@/lib/auth/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { toast } from 'sonner';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Loader2 } from "lucide-react";
+import { Logo } from "@/assets/logo";
+import { signIn } from "@/lib/auth/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -23,12 +23,12 @@ export default function LoginPage() {
     try {
       const result = await signIn.email({ email, password });
       if (result.error) {
-        toast.error(result.error.message ?? 'Invalid credentials');
+        toast.error(result.error.message ?? "Invalid credentials");
       } else {
-        router.push('/');
+        router.push("/");
       }
     } catch {
-      toast.error('Something went wrong');
+      toast.error("Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -40,7 +40,7 @@ export default function LoginPage() {
         <div className="rounded-lg border bg-card p-6 shadow-sm">
           <div className="flex items-center gap-2 mb-6">
             <Logo className="size-8 text-primary" />
-            <span className="text-lg font-semibold">OpenStore</span>
+            <span className="text-lg font-semibold">Locker</span>
           </div>
 
           <h1 className="text-xl font-semibold tracking-tight mb-1">Sign in</h1>
@@ -50,9 +50,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Email
-              </label>
+              <label className="text-sm font-medium">Email</label>
               <Input
                 type="email"
                 placeholder="you@example.com"
@@ -63,9 +61,7 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Password
-              </label>
+              <label className="text-sm font-medium">Password</label>
               <Input
                 type="password"
                 placeholder="Enter password"
@@ -76,20 +72,13 @@ export default function LoginPage() {
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                'Sign in'
-              )}
+              {loading ? <Loader2 className="animate-spin" /> : "Sign in"}
             </Button>
           </form>
 
           <p className="text-sm text-muted-foreground text-center mt-4">
-            Don&apos;t have an account?{' '}
-            <Link
-              href="/register"
-              className="text-primary hover:underline"
-            >
+            Don&apos;t have an account?{" "}
+            <Link href="/register" className="text-primary hover:underline">
               Sign up
             </Link>
           </p>

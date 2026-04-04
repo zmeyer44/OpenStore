@@ -1,5 +1,5 @@
 {
-  "name": "@openstore/web",
+  "name": "@locker/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,10 +12,10 @@
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.7.10",
-    "@openstore/common": "workspace:*",
-    "@openstore/database": "workspace:*",
-    "@openstore/email": "workspace:*",
-    "@openstore/storage": "workspace:*",
+    "@locker/common": "workspace:*",
+    "@locker/database": "workspace:*",
+    "@locker/email": "workspace:*",
+    "@locker/storage": "workspace:*",
     "@tanstack/react-query": "^5.90.21",
     "@trpc/client": "^11.13.4",
     "@trpc/react-query": "^11.13.4",

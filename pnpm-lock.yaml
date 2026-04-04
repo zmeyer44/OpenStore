@@ -26,16 +26,16 @@ importers:
       '@atlaskit/pragmatic-drag-and-drop':
         specifier: ^1.7.10
         version: 1.7.10
-      '@openstore/common':
+      '@locker/common':
         specifier: workspace:*
         version: link:../../packages/common
-      '@openstore/database':
+      '@locker/database':
         specifier: workspace:*
         version: link:../../packages/database
-      '@openstore/email':
+      '@locker/email':
         specifier: workspace:*
         version: link:../../packages/email
-      '@openstore/storage':
+      '@locker/storage':
         specifier: workspace:*
         version: link:../../packages/storage
       '@tanstack/react-query':
@@ -145,7 +145,7 @@ importers:
 
   packages/database:
     dependencies:
-      '@openstore/common':
+      '@locker/common':
         specifier: workspace:*
         version: link:../common
       dotenv:
@@ -2072,7 +2072,7 @@ packages:
   '@radix-ui/react-use-layout-effect@1.1.1':
     resolution: {integrity: sha512-RbJRS4UWQFkzHTTwVymMTUv8EqYhOp8dOOviLj2ugtTiXRaRQS7GLGxZTLL1jWhMeoSCf5zmcZkqTl9IiYfXcQ==}
     peerDependencies:
-      '@types/react': 19.1.1
+      '@types/react': '*'
       react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
     peerDependenciesMeta:
       '@types/react':

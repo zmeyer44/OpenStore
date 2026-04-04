@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { getDb } from '@openstore/database/client';
-import { users, sessions, accounts, verifications } from '@openstore/database';
+import { getDb } from '@locker/database/client';
+import { users, sessions, accounts, verifications } from '@locker/database';
 
 export const auth = betterAuth({
   database: drizzleAdapter(getDb(), {

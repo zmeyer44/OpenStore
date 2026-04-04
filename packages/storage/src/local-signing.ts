@@ -1,6 +1,6 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from "node:crypto";
 
-const DEV_SIGNING_SECRET = 'openstore-local-dev-signing-secret';
+const DEV_SIGNING_SECRET = "locker-local-dev-signing-secret";
 
 function getSigningSecret(): string {
   const secret =
@@ -10,9 +10,9 @@ function getSigningSecret(): string {
     return secret;
   }
 
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === "production") {
     throw new Error(
-      'LOCAL_BLOB_SIGNING_SECRET (or BETTER_AUTH_SECRET) must be set in production',
+      "LOCAL_BLOB_SIGNING_SECRET (or BETTER_AUTH_SECRET) must be set in production",
     );
   }
 
@@ -34,9 +34,9 @@ export function createLocalFileSignature(
   filePath: string,
   expiresAt: number,
 ): string {
-  return createHmac('sha256', getSigningSecret())
+  return createHmac("sha256", getSigningSecret())
     .update(`${filePath}:${expiresAt}`)
-    .digest('base64url');
+    .digest("base64url");
 }
 
 export function verifyLocalFileSignature(

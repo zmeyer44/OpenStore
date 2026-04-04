@@ -2,12 +2,12 @@ import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, workspaceAdminProcedure } from "../init";
-import { workspaceStorageConfigs } from "@openstore/database";
+import { workspaceStorageConfigs } from "@locker/database";
 import { encryptSecret } from "../../s3/auth";
 import {
   createStorageFromConfig,
   type WorkspaceStorageConfig,
-} from "@openstore/storage";
+} from "@locker/storage";
 
 const s3CredentialsSchema = z.object({
   provider: z.literal("s3"),
@@ -173,7 +173,7 @@ export const storageConfigRouter = createRouter({
       try {
         const storage = createStorageFromConfig(config);
 
-        const testPath = `.openstore-connection-test-${Date.now()}`;
+        const testPath = `.locker-connection-test-${Date.now()}`;
         const testData = Buffer.from("connection-test");
 
         await storage.upload({

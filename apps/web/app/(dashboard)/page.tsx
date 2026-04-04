@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/server/auth';
 import { headers } from 'next/headers';
-import { getDb } from '@openstore/database/client';
-import { workspaceMembers, workspaces } from '@openstore/database';
+import { getDb } from '@locker/database/client';
+import { workspaceMembers, workspaces } from '@locker/database';
 import { eq } from 'drizzle-orm';
 
 export default async function DashboardRootPage() {

@@ -1,26 +1,20 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef, use, useCallback } from 'react';
-import {
-  Download,
-  Lock,
-  AlertCircle,
-  Folder,
-  Mail,
-} from 'lucide-react';
-import { Logo } from '@/assets/logo';
-import { trpc } from '@/lib/trpc/client';
-import { formatBytes } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { FileIcon } from '@/components/file-icon';
-import { toast } from 'sonner';
+import { useState, useEffect, useRef, use, useCallback } from "react";
+import { Download, Lock, AlertCircle, Folder, Mail } from "lucide-react";
+import { Logo } from "@/assets/logo";
+import { trpc } from "@/lib/trpc/client";
+import { formatBytes } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { FileIcon } from "@/components/file-icon";
+import { toast } from "sonner";
 
 function generateVisitorId(): string {
-  const stored = localStorage.getItem('_os_vid');
+  const stored = localStorage.getItem("_os_vid");
   if (stored) return stored;
   const id = crypto.randomUUID();
-  localStorage.setItem('_os_vid', id);
+  localStorage.setItem("_os_vid", id);
   return id;
 }
 
@@ -30,8 +24,8 @@ export default function TrackedLinkPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = use(params);
-  const [password, setPassword] = useState('');
-  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
   const [enteredPassword, setEnteredPassword] = useState<string | undefined>();
   const [enteredEmail, setEnteredEmail] = useState<string | undefined>();
   const [tracked, setTracked] = useState(false);
@@ -49,27 +43,27 @@ export default function TrackedLinkPage({
   // Send tracking beacon when access succeeds
   const sendTrackingBeacon = useCallback(async () => {
     if (tracked) return;
-    if (!data || !('item' in data) || !data.item) return;
+    if (!data || !("item" in data) || !data.item) return;
 
     setTracked(true);
     startTimeRef.current = Date.now();
 
     try {
       const visitorId = generateVisitorId();
-      const res = await fetch('/api/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token,
           visitorId,
           email: enteredEmail,
-          eventType: 'view',
+          eventType: "view",
           pageUrl: window.location.href,
           referrer: document.referrer || null,
         }),
       });
       const result = await res.json();
-      if (result.ok && typeof result.eventId === 'string') {
+      if (result.ok && typeof result.eventId === "string") {
         eventIdRef.current = result.eventId;
       }
     } catch {
@@ -87,7 +81,7 @@ export default function TrackedLinkPage({
       if (!tracked || !eventIdRef.current) return;
       const duration = Math.round((Date.now() - startTimeRef.current) / 1000);
       navigator.sendBeacon(
-        '/api/track',
+        "/api/track",
         JSON.stringify({
           token,
           eventId: eventIdRef.current,
@@ -96,22 +90,22 @@ export default function TrackedLinkPage({
       );
     };
 
-    window.addEventListener('beforeunload', handleUnload);
-    return () => window.removeEventListener('beforeunload', handleUnload);
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
   }, [token, tracked]);
 
   const handleDownload = async (fileId?: string) => {
     try {
       // Track download event
       const visitorId = generateVisitorId();
-      fetch('/api/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      fetch("/api/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token,
           visitorId,
           email: enteredEmail,
-          eventType: 'download',
+          eventType: "download",
           pageUrl: window.location.href,
         }),
       });
@@ -122,7 +116,7 @@ export default function TrackedLinkPage({
         password: enteredPassword,
         email: enteredEmail,
       });
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = result.url;
       a.download = result.filename;
       a.click();
@@ -140,9 +134,11 @@ export default function TrackedLinkPage({
   }
 
   // Handle password/email gates
-  if (data && ('requiresPassword' in data || 'requiresEmail' in data)) {
-    const needsPassword = 'requiresPassword' in data && data.requiresPassword && !enteredPassword;
-    const needsEmail = 'requiresEmail' in data && data.requiresEmail && !enteredEmail;
+  if (data && ("requiresPassword" in data || "requiresEmail" in data)) {
+    const needsPassword =
+      "requiresPassword" in data && data.requiresPassword && !enteredPassword;
+    const needsEmail =
+      "requiresEmail" in data && data.requiresEmail && !enteredEmail;
 
     if (needsPassword || needsEmail) {
       return (
@@ -150,7 +146,7 @@ export default function TrackedLinkPage({
           <div className="w-full max-w-sm rounded-lg border bg-card p-6">
             <div className="flex items-center gap-2 mb-6">
               <Logo className="size-5 text-primary" />
-              <span className="title text-base">OpenStore</span>
+              <span className="title text-base">Locker</span>
             </div>
 
             {needsPassword && (
@@ -209,7 +205,7 @@ export default function TrackedLinkPage({
     }
   }
 
-  if (data && 'error' in data) {
+  if (data && "error" in data) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-full max-w-sm rounded-lg border bg-card p-6 text-center">
@@ -221,7 +217,7 @@ export default function TrackedLinkPage({
     );
   }
 
-  if (!data || !('item' in data) || !data.item) {
+  if (!data || !("item" in data) || !data.item) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-full max-w-sm rounded-lg border bg-card p-6 text-center">
@@ -242,13 +238,13 @@ export default function TrackedLinkPage({
       <div className="w-full max-w-md rounded-lg border bg-card p-6">
         <div className="flex items-center gap-2 mb-6">
           <HardDrive className="size-5 text-primary" />
-          <span className="title text-base">OpenStore</span>
+          <span className="title text-base">Locker</span>
           <span className="text-xs font-medium text-muted-foreground px-1.5 py-0.5 bg-primary/5 text-primary rounded-sm ml-auto">
             Shared
           </span>
         </div>
 
-        {item.type === 'file' ? (
+        {item.type === "file" ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-3 bg-background rounded-sm border">
               <FileIcon
@@ -266,7 +262,7 @@ export default function TrackedLinkPage({
               </div>
             </div>
 
-            {access === 'download' && (
+            {access === "download" && (
               <Button className="w-full" onClick={() => handleDownload()}>
                 <Download className="size-3.5" />
                 Download
@@ -297,7 +293,7 @@ export default function TrackedLinkPage({
                   <span className="text-xs font-medium text-muted-foreground">
                     {formatBytes(file.size)}
                   </span>
-                  {access === 'download' && (
+                  {access === "download" && (
                     <button
                       onClick={() => handleDownload(file.id)}
                       className="text-primary hover:text-primary/80 cursor-pointer"

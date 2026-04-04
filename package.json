@@ -1,5 +1,5 @@
 {
-  "name": "openstore",
+  "name": "locker",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -10,9 +10,9 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
-    "db:generate": "turbo db:generate --filter=@openstore/database",
-    "db:migrate": "turbo db:migrate --filter=@openstore/database",
-    "db:seed": "turbo db:seed --filter=@openstore/database",
+    "db:generate": "turbo db:generate --filter=@locker/database",
+    "db:migrate": "turbo db:migrate --filter=@locker/database",
+    "db:seed": "turbo db:seed --filter=@locker/database",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\""
   },
   "devDependencies": {

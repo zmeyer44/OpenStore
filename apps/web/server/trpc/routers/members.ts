@@ -1,20 +1,20 @@
-import { z } from 'zod';
-import { eq, and } from 'drizzle-orm';
-import { TRPCError } from '@trpc/server';
+import { z } from "zod";
+import { eq, and } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import {
   createRouter,
   protectedProcedure,
   workspaceProcedure,
   workspaceAdminProcedure,
-} from '../init';
+} from "../init";
 import {
   workspaces,
   workspaceMembers,
   workspaceInvites,
   users,
-} from '@openstore/database';
-import { inviteMemberSchema, updateMemberRoleSchema } from '@openstore/common';
-import crypto from 'crypto';
+} from "@locker/database";
+import { inviteMemberSchema, updateMemberRoleSchema } from "@locker/common";
+import crypto from "crypto";
 
 export const membersRouter = createRouter({
   list: workspaceProcedure.query(async ({ ctx }) => {
@@ -52,8 +52,8 @@ export const membersRouter = createRouter({
 
       if (existingMember.length > 0) {
         throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'User is already a member of this workspace',
+          code: "CONFLICT",
+          message: "User is already a member of this workspace",
         });
       }
 
@@ -65,18 +65,18 @@ export const membersRouter = createRouter({
           and(
             eq(workspaceInvites.workspaceId, ctx.workspaceId),
             eq(workspaceInvites.email, input.email),
-            eq(workspaceInvites.status, 'pending'),
+            eq(workspaceInvites.status, "pending"),
           ),
         );
 
       if (existingInvite.length > 0) {
         throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'An invitation is already pending for this email',
+          code: "CONFLICT",
+          message: "An invitation is already pending for this email",
         });
       }
 
-      const token = crypto.randomBytes(32).toString('hex');
+      const token = crypto.randomBytes(32).toString("hex");
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
@@ -94,10 +94,9 @@ export const membersRouter = createRouter({
 
       // Send invitation email
       try {
-        const { sendEmail } = await import('@openstore/email');
-        const { WorkspaceInviteEmail } = await import(
-          '@openstore/email/templates/workspace-invite'
-        );
+        const { sendEmail } = await import("@locker/email");
+        const { WorkspaceInviteEmail } =
+          await import("@locker/email/templates/workspace-invite");
 
         const [workspace] = await ctx.db
           .select({ name: workspaces.name })
@@ -110,23 +109,23 @@ export const membersRouter = createRouter({
           .where(eq(users.id, ctx.userId));
 
         const baseUrl =
-          process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+          process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
         const inviteUrl = `${baseUrl}/invite/${token}`;
 
         await sendEmail({
           to: input.email,
-          subject: `Join ${workspace?.name ?? 'workspace'} on OpenStore`,
+          subject: `Join ${workspace?.name ?? "workspace"} on Locker`,
           react: WorkspaceInviteEmail({
             email: input.email,
             url: inviteUrl,
-            workspaceName: workspace?.name ?? 'workspace',
+            workspaceName: workspace?.name ?? "workspace",
             inviterName: inviter?.name ?? undefined,
             inviterEmail: inviter?.email ?? undefined,
           }),
         });
       } catch {
         // Email send failure is non-fatal - invite is still created
-        console.error('Failed to send invitation email');
+        console.error("Failed to send invitation email");
       }
 
       return invite;
@@ -148,7 +147,7 @@ export const membersRouter = createRouter({
       .where(
         and(
           eq(workspaceInvites.workspaceId, ctx.workspaceId),
-          eq(workspaceInvites.status, 'pending'),
+          eq(workspaceInvites.status, "pending"),
         ),
       );
 
@@ -160,7 +159,7 @@ export const membersRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .update(workspaceInvites)
-        .set({ status: 'expired' })
+        .set({ status: "expired" })
         .where(
           and(
             eq(workspaceInvites.id, input.id),
@@ -180,26 +179,26 @@ export const membersRouter = createRouter({
         .where(
           and(
             eq(workspaceInvites.token, input.token),
-            eq(workspaceInvites.status, 'pending'),
+            eq(workspaceInvites.status, "pending"),
           ),
         );
 
       if (!invite) {
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Invitation not found or already used',
+          code: "NOT_FOUND",
+          message: "Invitation not found or already used",
         });
       }
 
       if (invite.expiresAt < new Date()) {
         await ctx.db
           .update(workspaceInvites)
-          .set({ status: 'expired' })
+          .set({ status: "expired" })
           .where(eq(workspaceInvites.id, invite.id));
 
         throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Invitation has expired',
+          code: "BAD_REQUEST",
+          message: "Invitation has expired",
         });
       }
 
@@ -211,8 +210,8 @@ export const membersRouter = createRouter({
 
       if (user?.email !== invite.email) {
         throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'This invitation was sent to a different email address',
+          code: "FORBIDDEN",
+          message: "This invitation was sent to a different email address",
         });
       }
 
@@ -230,7 +229,7 @@ export const membersRouter = createRouter({
       if (existing.length > 0) {
         await ctx.db
           .update(workspaceInvites)
-          .set({ status: 'accepted' })
+          .set({ status: "accepted" })
           .where(eq(workspaceInvites.id, invite.id));
 
         const [ws] = await ctx.db
@@ -251,7 +250,7 @@ export const membersRouter = createRouter({
       // Mark invite as accepted
       await ctx.db
         .update(workspaceInvites)
-        .set({ status: 'accepted' })
+        .set({ status: "accepted" })
         .where(eq(workspaceInvites.id, invite.id));
 
       const [ws] = await ctx.db
@@ -297,19 +296,19 @@ export const membersRouter = createRouter({
           ),
         );
 
-      if (!member) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (!member) throw new TRPCError({ code: "NOT_FOUND" });
 
-      if (member.role === 'owner') {
+      if (member.role === "owner") {
         throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Cannot change the owner\'s role',
+          code: "FORBIDDEN",
+          message: "Cannot change the owner's role",
         });
       }
 
       if (member.userId === ctx.userId) {
         throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Cannot change your own role',
+          code: "FORBIDDEN",
+          message: "Cannot change your own role",
         });
       }
 
@@ -335,12 +334,12 @@ export const membersRouter = createRouter({
           ),
         );
 
-      if (!member) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (!member) throw new TRPCError({ code: "NOT_FOUND" });
 
-      if (member.role === 'owner') {
+      if (member.role === "owner") {
         throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Cannot remove the workspace owner',
+          code: "FORBIDDEN",
+          message: "Cannot remove the workspace owner",
         });
       }
 
@@ -352,10 +351,11 @@ export const membersRouter = createRouter({
     }),
 
   leave: workspaceProcedure.mutation(async ({ ctx }) => {
-    if (ctx.workspaceRole === 'owner') {
+    if (ctx.workspaceRole === "owner") {
       throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'The owner cannot leave the workspace. Transfer ownership first.',
+        code: "FORBIDDEN",
+        message:
+          "The owner cannot leave the workspace. Transfer ownership first.",
       });
     }
 

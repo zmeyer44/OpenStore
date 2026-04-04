@@ -1,5 +1,5 @@
 {
-  "name": "@openstore/database",
+  "name": "@locker/database",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@openstore/common": "workspace:*",
+    "@locker/common": "workspace:*",
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.1",
     "pg": "^8.20.0"

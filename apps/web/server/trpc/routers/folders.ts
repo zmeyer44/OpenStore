@@ -1,9 +1,13 @@
-import { z } from 'zod';
-import { eq, and, asc, isNull } from 'drizzle-orm';
-import { createRouter, workspaceProcedure } from '../init';
-import { folders, files } from '@openstore/database';
-import { createFolderSchema, renameFolderSchema, moveItemSchema } from '@openstore/common';
-import { invalidateWorkspaceVfsSnapshot } from '../../vfs/openstore-vfs';
+import { z } from "zod";
+import { eq, and, asc, isNull } from "drizzle-orm";
+import { createRouter, workspaceProcedure } from "../init";
+import { folders, files } from "@locker/database";
+import {
+  createFolderSchema,
+  renameFolderSchema,
+  moveItemSchema,
+} from "@locker/common";
+import { invalidateWorkspaceVfsSnapshot } from "../../vfs/locker-vfs";
 
 export const foldersRouter = createRouter({
   list: workspaceProcedure
@@ -34,7 +38,12 @@ export const foldersRouter = createRouter({
       const [folder] = await ctx.db
         .select()
         .from(folders)
-        .where(and(eq(folders.id, input.id), eq(folders.workspaceId, ctx.workspaceId)));
+        .where(
+          and(
+            eq(folders.id, input.id),
+            eq(folders.workspaceId, ctx.workspaceId),
+          ),
+        );
 
       return folder ?? null;
     }),
@@ -49,9 +58,18 @@ export const foldersRouter = createRouter({
 
       while (currentId) {
         const [folder] = await ctx.db
-          .select({ id: folders.id, name: folders.name, parentId: folders.parentId })
+          .select({
+            id: folders.id,
+            name: folders.name,
+            parentId: folders.parentId,
+          })
           .from(folders)
-          .where(and(eq(folders.id, currentId), eq(folders.workspaceId, ctx.workspaceId)));
+          .where(
+            and(
+              eq(folders.id, currentId),
+              eq(folders.workspaceId, ctx.workspaceId),
+            ),
+          );
 
         if (!folder) break;
         breadcrumbs.unshift({ id: folder.id, name: folder.name });
@@ -75,7 +93,7 @@ export const foldersRouter = createRouter({
               eq(folders.workspaceId, ctx.workspaceId),
             ),
           );
-        if (!parent) throw new Error('Parent folder not found');
+        if (!parent) throw new Error("Parent folder not found");
       }
 
       const [folder] = await ctx.db
@@ -98,7 +116,12 @@ export const foldersRouter = createRouter({
       const [updated] = await ctx.db
         .update(folders)
         .set({ name: input.name, updatedAt: new Date() })
-        .where(and(eq(folders.id, input.id), eq(folders.workspaceId, ctx.workspaceId)))
+        .where(
+          and(
+            eq(folders.id, input.id),
+            eq(folders.workspaceId, ctx.workspaceId),
+          ),
+        )
         .returning();
 
       invalidateWorkspaceVfsSnapshot(ctx.workspaceId);
@@ -121,13 +144,15 @@ export const foldersRouter = createRouter({
           );
 
         if (!targetFolder) {
-          throw new Error('Target folder not found');
+          throw new Error("Target folder not found");
         }
 
         let currentId: string | null = input.targetFolderId;
         while (currentId) {
           if (currentId === input.id) {
-            throw new Error('Cannot move a folder into itself or its subfolder');
+            throw new Error(
+              "Cannot move a folder into itself or its subfolder",
+            );
           }
           const [parent] = await ctx.db
             .select({ parentId: folders.parentId })
@@ -139,7 +164,7 @@ export const foldersRouter = createRouter({
               ),
             );
           if (!parent) {
-            throw new Error('Target folder not found');
+            throw new Error("Target folder not found");
           }
           currentId = parent?.parentId ?? null;
         }
@@ -148,7 +173,12 @@ export const foldersRouter = createRouter({
       const [updated] = await ctx.db
         .update(folders)
         .set({ parentId: input.targetFolderId, updatedAt: new Date() })
-        .where(and(eq(folders.id, input.id), eq(folders.workspaceId, ctx.workspaceId)))
+        .where(
+          and(
+            eq(folders.id, input.id),
+            eq(folders.workspaceId, ctx.workspaceId),
+          ),
+        )
         .returning();
 
       invalidateWorkspaceVfsSnapshot(ctx.workspaceId);
@@ -167,7 +197,7 @@ export const foldersRouter = createRouter({
 });
 
 async function deleteFolderRecursive(
-  db: ReturnType<typeof import('@openstore/database/client').getDb>,
+  db: ReturnType<typeof import("@locker/database/client").getDb>,
   workspaceId: string,
   folderId: string,
 ) {
@@ -175,7 +205,9 @@ async function deleteFolderRecursive(
   const subfolders = await db
     .select({ id: folders.id })
     .from(folders)
-    .where(and(eq(folders.parentId, folderId), eq(folders.workspaceId, workspaceId)));
+    .where(
+      and(eq(folders.parentId, folderId), eq(folders.workspaceId, workspaceId)),
+    );
 
   // Recursively delete subfolders
   for (const subfolder of subfolders) {
@@ -186,7 +218,9 @@ async function deleteFolderRecursive(
   await db
     .update(files)
     .set({ folderId: null })
-    .where(and(eq(files.folderId, folderId), eq(files.workspaceId, workspaceId)));
+    .where(
+      and(eq(files.folderId, folderId), eq(files.workspaceId, workspaceId)),
+    );
 
   // Delete the folder
   await db

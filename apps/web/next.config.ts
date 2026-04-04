@@ -2,10 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   transpilePackages: [
-    "@openstore/common",
-    "@openstore/database",
-    "@openstore/email",
-    "@openstore/storage",
+    "@locker/common",
+    "@locker/database",
+    "@locker/email",
+    "@locker/storage",
   ],
   serverExternalPackages: ["re2"],
 };

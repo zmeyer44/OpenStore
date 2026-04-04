@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { files } from '@openstore/database';
+import { files } from '@locker/database';
 import { getBuiltinPluginBySlug } from '../catalog';
 import type {
   PluginHandler,

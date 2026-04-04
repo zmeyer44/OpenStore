@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../server/auth";
 import { headers } from "next/headers";
-import { getDb } from "@openstore/database/client";
-import { files, workspaces, workspaceMembers } from "@openstore/database";
+import { getDb } from "@locker/database/client";
+import { files, workspaces, workspaceMembers } from "@locker/database";
 import {
   createStorageForFile,
   shouldEnforceQuotaForConfig,
 } from "../../../../server/storage";
 import { eq, and, sql } from "drizzle-orm";
-import { invalidateWorkspaceVfsSnapshot } from "../../../../server/vfs/openstore-vfs";
+import { invalidateWorkspaceVfsSnapshot } from "../../../../server/vfs/locker-vfs";
 
 export const runtime = "nodejs";
 

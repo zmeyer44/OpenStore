@@ -2,21 +2,21 @@ import { TRPCError } from "@trpc/server";
 import { eq, and, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { createRouter, workspaceProcedure } from "../init";
-import { files, folders, workspaces } from "@openstore/database";
+import { files, folders, workspaces } from "@locker/database";
 import {
   createStorageForWorkspace,
   createStorageForFile,
   shouldEnforceQuota,
 } from "../../../server/storage";
 import { qmdClient, streamToString } from "../../plugins/handlers/qmd-client";
-import { invalidateWorkspaceVfsSnapshot } from "../../vfs/openstore-vfs";
+import { invalidateWorkspaceVfsSnapshot } from "../../vfs/locker-vfs";
 import {
   initiateUploadSchema,
   completeUploadSchema,
   abortUploadSchema,
   MULTIPART_THRESHOLD,
   MULTIPART_PART_SIZE,
-} from "@openstore/common";
+} from "@locker/common";
 
 export const uploadsRouter = createRouter({
   getProvider: workspaceProcedure.query(async ({ ctx }) => {

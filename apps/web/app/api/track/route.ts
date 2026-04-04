@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@openstore/database/client';
-import { trackedLinks, trackedLinkEvents } from '@openstore/database';
+import { getDb } from '@locker/database/client';
+import { trackedLinks, trackedLinkEvents } from '@locker/database';
 import { eq, and } from 'drizzle-orm';
 import {
   parseUserAgent,

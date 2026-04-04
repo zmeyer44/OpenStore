@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { use } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader2, Users, AlertCircle } from 'lucide-react';
-import { Logo } from '@/assets/logo';
-import { trpc } from '@/lib/trpc/client';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import { use } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2, Users, AlertCircle } from "lucide-react";
+import { Logo } from "@/assets/logo";
+import { trpc } from "@/lib/trpc/client";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export default function InvitePage({
   params,
@@ -22,7 +22,7 @@ export default function InvitePage({
 
   const acceptInvite = trpc.members.acceptInvite.useMutation({
     onSuccess: (result) => {
-      toast.success('You have joined the workspace!');
+      toast.success("You have joined the workspace!");
       router.push(`/w/${result.workspaceSlug}`);
     },
     onError: (err) => {
@@ -38,7 +38,7 @@ export default function InvitePage({
     );
   }
 
-  if (!invite || invite.status !== 'pending') {
+  if (!invite || invite.status !== "pending") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-full max-w-sm rounded-lg border bg-card p-6 text-center">
@@ -47,7 +47,7 @@ export default function InvitePage({
           <p className="text-sm text-muted-foreground">
             This invitation link is invalid, expired, or has already been used.
           </p>
-          <Button className="mt-4" onClick={() => router.push('/')}>
+          <Button className="mt-4" onClick={() => router.push("/")}>
             Go to dashboard
           </Button>
         </div>
@@ -62,7 +62,8 @@ export default function InvitePage({
           <AlertCircle className="size-8 text-muted-foreground/50 mx-auto mb-3" />
           <h1 className="text-lg font-semibold mb-1">Invitation expired</h1>
           <p className="text-sm text-muted-foreground">
-            This invitation has expired. Ask the workspace admin to send a new one.
+            This invitation has expired. Ask the workspace admin to send a new
+            one.
           </p>
         </div>
       </div>
@@ -74,7 +75,7 @@ export default function InvitePage({
       <div className="w-full max-w-sm rounded-lg border bg-card p-6">
         <div className="flex items-center gap-2 mb-6">
           <Logo className="size-8 text-primary" />
-          <span className="text-lg font-semibold">OpenStore</span>
+          <span className="text-lg font-semibold">Locker</span>
         </div>
 
         <div className="flex items-center gap-3 mb-4">
@@ -92,8 +93,9 @@ export default function InvitePage({
         </div>
 
         <p className="text-sm text-muted-foreground mb-6">
-          You&apos;ve been invited to join <strong>{invite.workspaceName}</strong> on
-          OpenStore. Accept the invitation to start collaborating.
+          You&apos;ve been invited to join{" "}
+          <strong>{invite.workspaceName}</strong> on Locker. Accept the
+          invitation to start collaborating.
         </p>
 
         <Button
@@ -104,7 +106,7 @@ export default function InvitePage({
           {acceptInvite.isPending ? (
             <Loader2 className="animate-spin" />
           ) : (
-            'Accept invitation'
+            "Accept invitation"
           )}
         </Button>
       </div>

@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { eq } from "drizzle-orm";
 import { createRouter, workspaceProcedure } from "../init";
-import { workspaces, files, folders } from "@openstore/database";
+import { workspaces, files, folders } from "@locker/database";
 import { shouldEnforceQuota } from "../../storage";
 
 export const storageRouter = createRouter({

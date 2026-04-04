@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/server/auth';
 import { headers } from 'next/headers';
-import { getDb } from '@openstore/database/client';
-import { workspaces, workspaceMembers } from '@openstore/database';
+import { getDb } from '@locker/database/client';
+import { workspaces, workspaceMembers } from '@locker/database';
 import { eq, and } from 'drizzle-orm';
 import { WorkspaceProvider } from '@/lib/workspace-context';
 

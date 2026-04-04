@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { eq, and } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
 import { createRouter, workspaceProcedure, publicProcedure } from '../init';
-import { uploadLinks, folders } from '@openstore/database';
-import { createUploadLinkSchema, UPLOAD_TOKEN_LENGTH } from '@openstore/common';
+import { uploadLinks, folders } from '@locker/database';
+import { createUploadLinkSchema, UPLOAD_TOKEN_LENGTH } from '@locker/common';
 import {
   hashLinkPassword,
   verifyLinkPassword,

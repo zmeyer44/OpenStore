@@ -21,13 +21,13 @@ import {
   resolveOrCreateFolderChain,
   buildS3KeyForFile,
 } from "@/server/s3/paths";
-import { getDb } from "@openstore/database/client";
+import { getDb } from "@locker/database/client";
 import {
   files,
   workspaces,
   s3MultipartUploads,
   s3MultipartParts,
-} from "@openstore/database";
+} from "@locker/database";
 import {
   createStorageForWorkspace,
   createStorageForFile,
@@ -508,7 +508,7 @@ async function handleUploadPart(
 }
 
 function createMultipartObjectStream(
-  storage: import("@openstore/storage").StorageProvider,
+  storage: import("@locker/storage").StorageProvider,
   parts: Array<{ storagePath: string }>,
 ): ReadableStream<Uint8Array> {
   let currentReader: ReadableStreamDefaultReader<Uint8Array> | null = null;

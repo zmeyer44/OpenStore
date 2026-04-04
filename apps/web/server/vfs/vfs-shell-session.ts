@@ -1,22 +1,22 @@
 import { randomUUID } from "node:crypto";
 import { Bash } from "just-bash";
-import type { Database } from "@openstore/database";
-import type { StorageProvider } from "@openstore/storage";
-import { OpenStoreVirtualFileSystem } from "./openstore-vfs";
+import type { Database } from "@locker/database";
+import type { StorageProvider } from "@locker/storage";
+import { LockerVirtualFileSystem } from "./locker-vfs";
 import { optimizedGrepCommand } from "./grep-command";
 
-type OpenStoreVfsType = OpenStoreVirtualFileSystem;
+type LockerVfsType = LockerVirtualFileSystem;
 
 const SESSION_TTL_MS = readPositiveInt(
-  process.env.OPENSTORE_VFS_SESSION_TTL_MS,
+  process.env.LOCKER_VFS_SESSION_TTL_MS,
   20 * 60 * 1000,
 );
 const DEFAULT_COMMAND_TIMEOUT_MS = readPositiveInt(
-  process.env.OPENSTORE_VFS_COMMAND_TIMEOUT_MS,
+  process.env.LOCKER_VFS_COMMAND_TIMEOUT_MS,
   12_000,
 );
 const MAX_COMMAND_TIMEOUT_MS = readPositiveInt(
-  process.env.OPENSTORE_VFS_COMMAND_TIMEOUT_MAX_MS,
+  process.env.LOCKER_VFS_COMMAND_TIMEOUT_MAX_MS,
   60_000,
 );
 
@@ -24,7 +24,7 @@ interface VfsShellSession {
   id: string;
   workspaceId: string;
   userId: string;
-  fs: OpenStoreVfsType;
+  fs: LockerVfsType;
   bash: Bash;
   cwd: string;
   env: Record<string, string>;
@@ -83,7 +83,7 @@ function enforceWorkspaceSessionCap(workspaceId: string): void {
 }
 
 async function resolveSafeDirectory(params: {
-  fs: OpenStoreVfsType;
+  fs: LockerVfsType;
   requestedCwd: string;
   fallbackCwd: string;
 }): Promise<string> {
@@ -153,7 +153,7 @@ export async function createVfsShellSession(params: {
   pruneExpiredSessions();
   enforceWorkspaceSessionCap(params.workspaceId);
 
-  const fs = await OpenStoreVirtualFileSystem.create({
+  const fs = await LockerVirtualFileSystem.create({
     db: params.db,
     workspaceId: params.workspaceId,
     storage: params.storage,

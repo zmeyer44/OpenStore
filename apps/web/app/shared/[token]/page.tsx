@@ -1,20 +1,14 @@
-'use client';
+"use client";
 
-import { useState, use } from 'react';
-import {
-  Download,
-  Lock,
-  AlertCircle,
-  FileText,
-  Folder,
-} from 'lucide-react';
-import { Logo } from '@/assets/logo';
-import { trpc } from '@/lib/trpc/client';
-import { formatBytes } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { FileIcon } from '@/components/file-icon';
-import { toast } from 'sonner';
+import { useState, use } from "react";
+import { Download, Lock, AlertCircle, FileText, Folder } from "lucide-react";
+import { Logo } from "@/assets/logo";
+import { trpc } from "@/lib/trpc/client";
+import { formatBytes } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { FileIcon } from "@/components/file-icon";
+import { toast } from "sonner";
 
 export default function SharedPage({
   params,
@@ -22,7 +16,7 @@ export default function SharedPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = use(params);
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState("");
   const [enteredPassword, setEnteredPassword] = useState<string | undefined>();
 
   const { data, isLoading } = trpc.shares.access.useQuery({
@@ -39,7 +33,7 @@ export default function SharedPage({
         fileId,
         password: enteredPassword,
       });
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = result.url;
       a.download = result.filename;
       a.click();
@@ -56,13 +50,13 @@ export default function SharedPage({
     );
   }
 
-  if (data && 'requiresPassword' in data && data.requiresPassword) {
+  if (data && "requiresPassword" in data && data.requiresPassword) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-full max-w-sm rounded-lg border bg-card p-6">
           <div className="flex items-center gap-2 mb-6">
             <Logo className="size-5 text-primary" />
-            <span className="title text-base">OpenStore</span>
+            <span className="title text-base">Locker</span>
           </div>
 
           <Lock className="h-8 w-8 text-muted-foreground/50 mb-3" />
@@ -93,7 +87,7 @@ export default function SharedPage({
     );
   }
 
-  if (data && 'error' in data) {
+  if (data && "error" in data) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-full max-w-sm rounded-lg border bg-card p-6 text-center">
@@ -105,7 +99,7 @@ export default function SharedPage({
     );
   }
 
-  if (!data || !('item' in data) || !data.item) {
+  if (!data || !("item" in data) || !data.item) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-full max-w-sm rounded-lg border bg-card p-6 text-center">
@@ -126,16 +120,20 @@ export default function SharedPage({
       <div className="w-full max-w-md rounded-lg border bg-card p-6">
         <div className="flex items-center gap-2 mb-6">
           <HardDrive className="size-5 text-primary" />
-          <span className="title text-base">OpenStore</span>
+          <span className="title text-base">Locker</span>
           <span className="text-xs font-medium text-muted-foreground px-1.5 py-0.5 bg-primary/5 text-primary rounded-sm ml-auto">
             Shared
           </span>
         </div>
 
-        {item.type === 'file' ? (
+        {item.type === "file" ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-3 bg-background rounded-sm border">
-              <FileIcon name={item.name} mimeType={item.mimeType} className="h-6 w-6" />
+              <FileIcon
+                name={item.name}
+                mimeType={item.mimeType}
+                className="h-6 w-6"
+              />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-foreground truncate">
                   {item.name}
@@ -146,7 +144,7 @@ export default function SharedPage({
               </div>
             </div>
 
-            {access === 'download' && (
+            {access === "download" && (
               <Button className="w-full" onClick={() => handleDownload()}>
                 <Download className="size-3.5" />
                 Download
@@ -177,7 +175,7 @@ export default function SharedPage({
                   <span className="text-xs font-medium text-muted-foreground">
                     {formatBytes(file.size)}
                   </span>
-                  {access === 'download' && (
+                  {access === "download" && (
                     <button
                       onClick={() => handleDownload(file.id)}
                       className="text-primary hover:text-primary/80 cursor-pointer"

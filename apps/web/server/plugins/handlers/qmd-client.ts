@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
-import { workspacePlugins } from '@openstore/database';
-import type { Database } from '@openstore/database';
+import { workspacePlugins } from '@locker/database';
+import type { Database } from '@locker/database';
 
 const QMD_SERVICE_URL = process.env.QMD_SERVICE_URL;
 const QMD_API_SECRET = process.env.QMD_API_SECRET;

@@ -9,8 +9,8 @@ import {
   Preview,
   Section,
   Text,
-} from '@react-email/components';
-import * as React from 'react';
+} from "@react-email/components";
+import * as React from "react";
 
 interface WorkspaceInviteEmailProps {
   email: string;
@@ -30,11 +30,11 @@ export function WorkspaceInviteEmail({
   return (
     <Html>
       <Head />
-      <Preview>Join {workspaceName} on OpenStore</Preview>
+      <Preview>Join {workspaceName} on Locker</Preview>
       <Body style={main}>
         <Container style={container}>
           <Section style={logoSection}>
-            <Text style={logoText}>OpenStore</Text>
+            <Text style={logoText}>Locker</Text>
           </Section>
 
           <Text style={heading}>Join {workspaceName}</Text>
@@ -42,12 +42,12 @@ export function WorkspaceInviteEmail({
           {inviterName && inviterEmail ? (
             <Text style={paragraph}>
               <strong>{inviterName}</strong> ({inviterEmail}) has invited you to
-              join <strong>{workspaceName}</strong> on OpenStore.
+              join <strong>{workspaceName}</strong> on Locker.
             </Text>
           ) : (
             <Text style={paragraph}>
               You have been invited to join <strong>{workspaceName}</strong> on
-              OpenStore.
+              Locker.
             </Text>
           )}
 
@@ -72,70 +72,70 @@ export function WorkspaceInviteEmail({
 export default WorkspaceInviteEmail;
 
 const main: React.CSSProperties = {
-  backgroundColor: '#f6f9fc',
+  backgroundColor: "#f6f9fc",
   fontFamily:
     '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
 };
 
 const container: React.CSSProperties = {
-  backgroundColor: '#ffffff',
-  border: '1px solid #e5e7eb',
-  borderRadius: '8px',
-  margin: '40px auto',
-  padding: '40px',
-  maxWidth: '480px',
+  backgroundColor: "#ffffff",
+  border: "1px solid #e5e7eb",
+  borderRadius: "8px",
+  margin: "40px auto",
+  padding: "40px",
+  maxWidth: "480px",
 };
 
 const logoSection: React.CSSProperties = {
-  marginBottom: '24px',
+  marginBottom: "24px",
 };
 
 const logoText: React.CSSProperties = {
-  fontSize: '20px',
+  fontSize: "20px",
   fontWeight: 700,
-  color: '#111827',
-  margin: '0',
+  color: "#111827",
+  margin: "0",
 };
 
 const heading: React.CSSProperties = {
-  fontSize: '24px',
+  fontSize: "24px",
   fontWeight: 600,
-  color: '#111827',
-  margin: '0 0 16px',
+  color: "#111827",
+  margin: "0 0 16px",
 };
 
 const paragraph: React.CSSProperties = {
-  fontSize: '14px',
-  lineHeight: '24px',
-  color: '#374151',
-  margin: '0 0 24px',
+  fontSize: "14px",
+  lineHeight: "24px",
+  color: "#374151",
+  margin: "0 0 24px",
 };
 
 const buttonSection: React.CSSProperties = {
-  textAlign: 'center' as const,
-  marginBottom: '32px',
+  textAlign: "center" as const,
+  marginBottom: "32px",
 };
 
 const button: React.CSSProperties = {
-  backgroundColor: '#111827',
-  borderRadius: '6px',
-  color: '#ffffff',
-  fontSize: '14px',
+  backgroundColor: "#111827",
+  borderRadius: "6px",
+  color: "#ffffff",
+  fontSize: "14px",
   fontWeight: 600,
-  textDecoration: 'none',
-  textAlign: 'center' as const,
-  padding: '12px 24px',
-  display: 'inline-block',
+  textDecoration: "none",
+  textAlign: "center" as const,
+  padding: "12px 24px",
+  display: "inline-block",
 };
 
 const hr: React.CSSProperties = {
-  borderColor: '#e5e7eb',
-  margin: '0 0 16px',
+  borderColor: "#e5e7eb",
+  margin: "0 0 16px",
 };
 
 const footer: React.CSSProperties = {
-  fontSize: '12px',
-  lineHeight: '20px',
-  color: '#6b7280',
-  margin: '0',
+  fontSize: "12px",
+  lineHeight: "20px",
+  color: "#6b7280",
+  margin: "0",
 };

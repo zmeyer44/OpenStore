@@ -28,7 +28,7 @@ export const qmdSearchHandler: PluginHandler = {
       }
 
       try {
-        const { files } = await import("@openstore/database");
+        const { files } = await import("@locker/database");
         const { eq, and } = await import("drizzle-orm");
 
         const [file] = await ctx.db
@@ -93,7 +93,7 @@ export const qmdSearchHandler: PluginHandler = {
     }
 
     // Fallback: score workspace files by name matching
-    const { files } = await import("@openstore/database");
+    const { files } = await import("@locker/database");
     const { eq, and, ilike } = await import("drizzle-orm");
 
     const query = params.query.trim().toLowerCase();

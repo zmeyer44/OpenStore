@@ -1,6 +1,6 @@
 import { eq, and, isNull } from 'drizzle-orm';
-import { folders } from '@openstore/database';
-import type { Database } from '@openstore/database/client';
+import { folders } from '@locker/database';
+import type { Database } from '@locker/database/client';
 
 /**
  * Resolves an S3 key's directory path to a folder ID, creating folders as needed.

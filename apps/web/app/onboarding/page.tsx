@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
-import { Logo } from '@/assets/logo';
-import { trpc } from '@/lib/trpc/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { toast } from 'sonner';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { Logo } from "@/assets/logo";
+import { trpc } from "@/lib/trpc/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [name, setName] = useState('');
+  const [name, setName] = useState("");
 
   const createWorkspace = trpc.workspaces.create.useMutation({
     onSuccess: (workspace) => {
@@ -34,7 +34,7 @@ export default function OnboardingPage() {
         <div className="rounded-lg border bg-card p-6 shadow-sm">
           <div className="flex items-center gap-2 mb-6">
             <Logo className="size-8 text-primary" />
-            <span className="text-lg font-semibold">OpenStore</span>
+            <span className="text-lg font-semibold">Locker</span>
           </div>
 
           <h1 className="text-xl font-semibold tracking-tight mb-1">
@@ -64,7 +64,7 @@ export default function OnboardingPage() {
               {createWorkspace.isPending ? (
                 <Loader2 className="animate-spin" />
               ) : (
-                'Create workspace'
+                "Create workspace"
               )}
             </Button>
           </form>

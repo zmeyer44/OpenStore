@@ -1,4 +1,4 @@
-import { MULTIPART_MAX_CONCURRENCY } from '@openstore/common';
+import { MULTIPART_MAX_CONCURRENCY } from '@locker/common';
 
 export interface UploadProgress {
   loaded: number;

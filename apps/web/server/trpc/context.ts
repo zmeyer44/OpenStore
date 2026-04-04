@@ -1,6 +1,6 @@
 import type { FetchCreateContextFnOptions } from '@trpc/server/adapters/fetch';
-import { getDb } from '@openstore/database/client';
-import { workspaces, workspaceMembers } from '@openstore/database/schema';
+import { getDb } from '@locker/database/client';
+import { workspaces, workspaceMembers } from '@locker/database/schema';
 import { eq, and } from 'drizzle-orm';
 import { auth } from '../auth';
 import { headers } from 'next/headers';

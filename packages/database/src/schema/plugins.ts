@@ -10,7 +10,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import type { PluginManifest, PluginPermission } from '@openstore/common';
+import type { PluginManifest, PluginPermission } from '@locker/common';
 import { workspaces } from './workspaces';
 import { users } from './users';
 

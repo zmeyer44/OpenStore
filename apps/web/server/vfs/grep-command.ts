@@ -4,7 +4,7 @@ import { defineCommand } from "just-bash";
 import type { CommandContext, ExecResult } from "just-bash";
 
 /**
- * Optimized grep command for the OpenStore VFS.
+ * Optimized grep command for the Locker VFS.
  *
  * The built-in just-bash grep calls readFile serially for each file during
  * recursive searches. This custom command resolves the full file list up front

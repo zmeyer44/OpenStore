@@ -1,8 +1,8 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { createStorageForWorkspace } from "../storage";
-import { workspacePlugins, workspacePluginSecrets } from "@openstore/database";
-import type { Database } from "@openstore/database";
-import type { PluginPermission } from "@openstore/common";
+import { workspacePlugins, workspacePluginSecrets } from "@locker/database";
+import type { Database } from "@locker/database";
+import type { PluginPermission } from "@locker/common";
 import { decryptPluginSecret } from "./secrets";
 import type {
   PluginHandler,

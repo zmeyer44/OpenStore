@@ -1,4 +1,4 @@
-# OpenStore
+# Locker
 
 Open-source file storage platform. A self-hostable alternative to Dropbox and Google Drive.
 
@@ -24,7 +24,7 @@ Open-source file storage platform. A self-hostable alternative to Dropbox and Go
 ## Project Structure
 
 ```
-openstore/
+locker/
 ├── apps/web/              Next.js web app
 │   ├── app/               Pages and API routes
 │   ├── components/        UI components
@@ -85,29 +85,29 @@ Open [http://localhost:3000](http://localhost:3000), create an account, and star
 
 Set `BLOB_STORAGE_PROVIDER` in `.env`:
 
-| Provider | Value | Required Env Vars |
-|----------|-------|-------------------|
-| Local filesystem | `local` | `LOCAL_BLOB_DIR` |
-| AWS S3 | `s3` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `S3_BUCKET` |
-| Cloudflare R2 | `r2` | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` |
-| Vercel Blob | `vercel` | `BLOB_READ_WRITE_TOKEN` |
+| Provider         | Value    | Required Env Vars                                                        |
+| ---------------- | -------- | ------------------------------------------------------------------------ |
+| Local filesystem | `local`  | `LOCAL_BLOB_DIR`                                                         |
+| AWS S3           | `s3`     | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `S3_BUCKET`  |
+| Cloudflare R2    | `r2`     | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` |
+| Vercel Blob      | `vercel` | `BLOB_READ_WRITE_TOKEN`                                                  |
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start all packages in dev mode |
-| `pnpm build` | Production build |
-| `pnpm typecheck` | Type-check all packages |
-| `pnpm lint` | Lint all packages |
+| Command            | Description                      |
+| ------------------ | -------------------------------- |
+| `pnpm dev`         | Start all packages in dev mode   |
+| `pnpm build`       | Production build                 |
+| `pnpm typecheck`   | Type-check all packages          |
+| `pnpm lint`        | Lint all packages                |
 | `pnpm db:generate` | Generate a new Drizzle migration |
-| `pnpm db:migrate` | Apply pending migrations |
-| `pnpm db:seed` | Seed the database |
-| `pnpm format` | Format code with Prettier |
+| `pnpm db:migrate`  | Apply pending migrations         |
+| `pnpm db:seed`     | Seed the database                |
+| `pnpm format`      | Format code with Prettier        |
 
 ## Virtual Filesystem Shell API
 
-OpenStore now includes a read-only virtual filesystem over workspace files/folders, powered by [`just-bash`](https://github.com/vercel-labs/just-bash).
+Locker includes a read-only virtual filesystem over workspace files/folders, powered by [`just-bash`](https://github.com/vercel-labs/just-bash).
 
 The shell API is available on tRPC router `vfsShell`:
 

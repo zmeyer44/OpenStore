@@ -1,8 +1,8 @@
 import path from "node:path";
 import { and, eq } from "drizzle-orm";
-import { files, folders } from "@openstore/database";
-import type { Database } from "@openstore/database";
-import type { StorageProvider } from "@openstore/storage";
+import { files, folders } from "@locker/database";
+import type { Database } from "@locker/database";
+import type { StorageProvider } from "@locker/storage";
 import type {
   CpOptions,
   FsStat,
@@ -35,19 +35,19 @@ const FILE_MODE = 0o444;
 const DIRECTORY_MODE = 0o555;
 
 const TREE_CACHE_TTL_MS = readPositiveInt(
-  process.env.OPENSTORE_VFS_TREE_CACHE_TTL_MS,
+  process.env.LOCKER_VFS_TREE_CACHE_TTL_MS,
   15_000,
 );
 const CONTENT_CACHE_TTL_MS = readPositiveInt(
-  process.env.OPENSTORE_VFS_CONTENT_CACHE_TTL_MS,
+  process.env.LOCKER_VFS_CONTENT_CACHE_TTL_MS,
   120_000,
 );
 const MAX_CONTENT_CACHE_ENTRIES = readPositiveInt(
-  process.env.OPENSTORE_VFS_CONTENT_CACHE_MAX_ENTRIES,
+  process.env.LOCKER_VFS_CONTENT_CACHE_MAX_ENTRIES,
   200,
 );
 const MAX_READ_BYTES = readPositiveInt(
-  process.env.OPENSTORE_VFS_MAX_READ_BYTES,
+  process.env.LOCKER_VFS_MAX_READ_BYTES,
   10 * 1024 * 1024,
 );
 
@@ -482,7 +482,7 @@ async function getWorkspaceSnapshot(params: {
     return pending;
   }
 
-  const generation = (snapshotGeneration.get(params.workspaceId) ?? 0);
+  const generation = snapshotGeneration.get(params.workspaceId) ?? 0;
   const buildPromise = buildWorkspaceSnapshot(params)
     .then((snapshot) => {
       // Only cache if no invalidation occurred since this build started
@@ -505,10 +505,13 @@ async function getWorkspaceSnapshot(params: {
 export function invalidateWorkspaceVfsSnapshot(workspaceId: string): void {
   snapshotCache.delete(workspaceId);
   pendingSnapshotBuilds.delete(workspaceId);
-  snapshotGeneration.set(workspaceId, (snapshotGeneration.get(workspaceId) ?? 0) + 1);
+  snapshotGeneration.set(
+    workspaceId,
+    (snapshotGeneration.get(workspaceId) ?? 0) + 1,
+  );
 }
 
-export class OpenStoreVirtualFileSystem implements IFileSystem {
+export class LockerVirtualFileSystem implements IFileSystem {
   private readonly workspaceId: string;
   private readonly storage: StorageProvider;
   private readonly snapshot: VfsSnapshot;
@@ -527,13 +530,13 @@ export class OpenStoreVirtualFileSystem implements IFileSystem {
     db: Database;
     workspaceId: string;
     storage: StorageProvider;
-  }): Promise<OpenStoreVirtualFileSystem> {
+  }): Promise<LockerVirtualFileSystem> {
     const snapshot = await getWorkspaceSnapshot({
       db: params.db,
       workspaceId: params.workspaceId,
     });
 
-    return new OpenStoreVirtualFileSystem({
+    return new LockerVirtualFileSystem({
       workspaceId: params.workspaceId,
       storage: params.storage,
       snapshot,

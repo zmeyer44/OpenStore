@@ -17,7 +17,7 @@ import {
   pluginManifestSchema,
   type PluginConfigField,
   type PluginManifest,
-} from '@openstore/common';
+} from '@locker/common';
 import { trpc } from '@/lib/trpc/client';
 import { useWorkspace } from '@/lib/workspace-context';
 import { Button } from '@/components/ui/button';

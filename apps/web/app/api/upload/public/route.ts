@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@openstore/database/client";
-import { files, uploadLinks, workspaces } from "@openstore/database";
+import { getDb } from "@locker/database/client";
+import { files, uploadLinks, workspaces } from "@locker/database";
 import {
   createStorageForWorkspace,
   shouldEnforceQuota,

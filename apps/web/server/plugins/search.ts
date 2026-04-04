@@ -1,4 +1,4 @@
-import type { Database } from '@openstore/database';
+import type { Database } from '@locker/database';
 import { dispatchSearch } from './runtime';
 // Ensure built-in handlers are registered
 import './handlers';

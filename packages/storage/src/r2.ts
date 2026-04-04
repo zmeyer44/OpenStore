@@ -38,7 +38,7 @@ export class R2StorageAdapter implements StorageProvider {
           config?.secretAccessKey ?? process.env.R2_SECRET_ACCESS_KEY!,
       },
     });
-    this.bucket = config?.bucket ?? process.env.R2_BUCKET ?? "openstore";
+    this.bucket = config?.bucket ?? process.env.R2_BUCKET ?? "locker";
     this.publicUrl = config?.publicUrl ?? process.env.R2_PUBLIC_URL;
   }
 
