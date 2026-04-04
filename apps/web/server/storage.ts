@@ -18,12 +18,20 @@ function buildConfig(row: {
   endpoint: string | null;
   encryptedCredentials: string;
 }): WorkspaceStorageConfig {
+  let credentials: WorkspaceStorageConfig["credentials"];
+  try {
+    credentials = JSON.parse(decryptSecret(row.encryptedCredentials));
+  } catch {
+    throw new Error(
+      "Failed to decrypt storage credentials — the encryption key may have been rotated",
+    );
+  }
   return {
     provider: row.provider as "s3" | "r2" | "vercel",
     bucket: row.bucket,
     region: row.region,
     endpoint: row.endpoint,
-    credentials: JSON.parse(decryptSecret(row.encryptedCredentials)),
+    credentials,
   };
 }
 

@@ -288,7 +288,7 @@ function BringYourOwnBucket() {
   function buildPayload() {
     return {
       provider,
-      bucket,
+      bucket: provider === "vercel" ? "vercel-blob" : bucket,
       region: region || undefined,
       endpoint: endpoint || undefined,
       credentials: buildCredentials(),
@@ -296,7 +296,7 @@ function BringYourOwnBucket() {
   }
 
   function hasRequiredFields() {
-    if (!bucket) return false;
+    if (provider !== "vercel" && !bucket) return false;
     switch (provider) {
       case "s3":
         return !!accessKeyId && !!secretAccessKey;
@@ -354,17 +354,19 @@ function BringYourOwnBucket() {
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Bucket name</label>
-          <Input
-            value={bucket}
-            onChange={(e) => {
-              setBucket(e.target.value);
-              markEdited();
-            }}
-            placeholder="my-storage-bucket"
-          />
-        </div>
+        {provider !== "vercel" && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Bucket name</label>
+            <Input
+              value={bucket}
+              onChange={(e) => {
+                setBucket(e.target.value);
+                markEdited();
+              }}
+              placeholder="my-storage-bucket"
+            />
+          </div>
+        )}
 
         {provider === "s3" && (
           <>

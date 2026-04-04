@@ -116,28 +116,29 @@ export const storageConfigRouter = createRouter({
         return updated;
       }
 
-      if (bucketOrProviderChanged) {
-        // Bucket or provider changed: deactivate old config (keep it for
-        // existing file references) and create a new active one.
-        await ctx.db
-          .update(workspaceStorageConfigs)
-          .set({ isActive: false, updatedAt: new Date() })
-          .where(eq(workspaceStorageConfigs.id, existing.id));
-      }
+      // Deactivate old + insert new must be atomic so a failed insert
+      // doesn't leave the workspace with zero active configs.
+      const [created] = await ctx.db.transaction(async (tx) => {
+        if (bucketOrProviderChanged) {
+          await tx
+            .update(workspaceStorageConfigs)
+            .set({ isActive: false, updatedAt: new Date() })
+            .where(eq(workspaceStorageConfigs.id, existing.id));
+        }
 
-      // Insert new active config
-      const [created] = await ctx.db
-        .insert(workspaceStorageConfigs)
-        .values({
-          workspaceId: ctx.workspaceId,
-          provider: input.provider,
-          bucket: input.bucket,
-          region: input.region ?? null,
-          endpoint: input.endpoint ?? null,
-          encryptedCredentials,
-          isActive: true,
-        })
-        .returning(configSelect);
+        return tx
+          .insert(workspaceStorageConfigs)
+          .values({
+            workspaceId: ctx.workspaceId,
+            provider: input.provider,
+            bucket: input.bucket,
+            region: input.region ?? null,
+            endpoint: input.endpoint ?? null,
+            encryptedCredentials,
+            isActive: true,
+          })
+          .returning(configSelect);
+      });
 
       return created;
     }),
@@ -181,7 +182,8 @@ export const storageConfigRouter = createRouter({
           contentType: "text/plain",
         });
 
-        await storage.delete(testPath);
+        // Best-effort cleanup — don't let a delete failure mask a successful connection test
+        await storage.delete(testPath).catch(() => {});
 
         // Update last tested timestamp on the active config if it exists
         await ctx.db
