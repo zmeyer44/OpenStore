@@ -58,7 +58,7 @@ export default function WorkspaceSettingsPage() {
   const deleteWs = trpc.workspaces.delete.useMutation({
     onSuccess: () => {
       toast.success("Workspace deleted");
-      router.push("/");
+      router.push("/home");
     },
     onError: (err) => toast.error(err.message),
   });

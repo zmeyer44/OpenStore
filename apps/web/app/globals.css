@@ -76,7 +76,8 @@
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: var(--font-geist-sans), "Geist Sans", system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), "Geist Mono", "SF Mono", Menlo, monospace;
+  --font-mono:
+    var(--font-geist-mono), "Geist Mono", "SF Mono", Menlo, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -124,4 +125,62 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ── Marketing site utilities ─────────────────────────────── */
+
+:root {
+  --mkt-dark: oklch(0.16 0.01 264);
+  --mkt-dark-secondary: oklch(0.21 0.01 264);
+  --grid-gap: clamp(1rem, 2.5vw, 2rem);
+}
+
+@theme inline {
+  --color-mkt-dark: var(--mkt-dark);
+  --color-mkt-dark-secondary: var(--mkt-dark-secondary);
+}
+
+/* 12-column marketing grid */
+.grid-layout {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--grid-gap);
+  max-width: 80rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: clamp(1.25rem, 4vw, 3.5rem);
+  padding-right: clamp(1.25rem, 4vw, 3.5rem);
+}
+
+/* Marketing typography scale */
+.mkt-display {
+  font-size: clamp(2.5rem, 5.5vw, 4.25rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+}
+.mkt-heading {
+  font-size: clamp(1.75rem, 3.5vw, 2.75rem);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  font-weight: 600;
+}
+.mkt-subheading {
+  font-size: clamp(1.125rem, 2vw, 1.375rem);
+  line-height: 1.4;
+  font-weight: 500;
+}
+.mkt-body {
+  font-size: clamp(0.9375rem, 1.25vw, 1.0625rem);
+  line-height: 1.65;
+}
+.mkt-body-sm {
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+.mkt-label {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  font-weight: 550;
+  letter-spacing: 0.02em;
 }

@@ -1,10 +1,10 @@
-import { redirect } from 'next/navigation';
-import { auth } from '@/server/auth';
-import { headers } from 'next/headers';
-import { getDb } from '@locker/database/client';
-import { workspaces, workspaceMembers } from '@locker/database';
-import { eq, and } from 'drizzle-orm';
-import { WorkspaceProvider } from '@/lib/workspace-context';
+import { redirect } from "next/navigation";
+import { auth } from "@/server/auth";
+import { headers } from "next/headers";
+import { getDb } from "@locker/database/client";
+import { workspaces, workspaceMembers } from "@locker/database";
+import { eq, and } from "drizzle-orm";
+import { WorkspaceProvider } from "@/lib/workspace-context";
 
 export default async function WorkspaceLayout({
   children,
@@ -17,7 +17,7 @@ export default async function WorkspaceLayout({
   const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user) {
-    redirect('/login');
+    redirect("/login");
   }
 
   const db = getDb();
@@ -38,7 +38,7 @@ export default async function WorkspaceLayout({
     );
 
   if (!membership) {
-    redirect('/');
+    redirect("/home");
   }
 
   return (

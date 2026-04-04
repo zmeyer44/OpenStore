@@ -25,7 +25,7 @@ export default function LoginPage() {
       if (result.error) {
         toast.error(result.error.message ?? "Invalid credentials");
       } else {
-        router.push("/");
+        router.push("/home");
       }
     } catch {
       toast.error("Something went wrong");
@@ -35,55 +35,53 @@ export default function LoginPage() {
   };
 
   return (
+    <div className="w-full max-w-sm">
+      <div className="rounded-lg border bg-card p-6 shadow-sm">
+        <div className="flex items-center gap-2 mb-6">
+          <Logo className="size-8 text-primary" />
+          <span className="text-lg font-semibold">Locker</span>
+        </div>
 
-      <div className="w-full max-w-sm">
-        <div className="rounded-lg border bg-card p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-6">
-            <Logo className="size-8 text-primary" />
-            <span className="text-lg font-semibold">Locker</span>
+        <h1 className="text-xl font-semibold tracking-tight mb-1">Sign in</h1>
+        <p className="text-sm text-muted-foreground mb-6">
+          Enter your credentials to access your files
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Email</label>
+            <Input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
           </div>
 
-          <h1 className="text-xl font-semibold tracking-tight mb-1">Sign in</h1>
-          <p className="text-sm text-muted-foreground mb-6">
-            Enter your credentials to access your files
-          </p>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Password</label>
+            <Input
+              type="password"
+              placeholder="Enter password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Email</label>
-              <Input
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? <Loader2 className="animate-spin" /> : "Sign in"}
+          </Button>
+        </form>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Password</label>
-              <Input
-                type="password"
-                placeholder="Enter password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? <Loader2 className="animate-spin" /> : "Sign in"}
-            </Button>
-          </form>
-
-          <p className="text-sm text-muted-foreground text-center mt-4">
-            Don&apos;t have an account?{" "}
-            <Link href="/register" className="text-primary hover:underline">
-              Sign up
-            </Link>
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground text-center mt-4">
+          Don&apos;t have an account?{" "}
+          <Link href="/register" className="text-primary hover:underline">
+            Sign up
+          </Link>
+        </p>
       </div>
-  
+    </div>
   );
 }

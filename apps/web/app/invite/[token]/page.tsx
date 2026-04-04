@@ -47,7 +47,7 @@ export default function InvitePage({
           <p className="text-sm text-muted-foreground">
             This invitation link is invalid, expired, or has already been used.
           </p>
-          <Button className="mt-4" onClick={() => router.push("/")}>
+          <Button className="mt-4" onClick={() => router.push("/home")}>
             Go to dashboard
           </Button>
         </div>
