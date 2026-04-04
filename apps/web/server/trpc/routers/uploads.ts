@@ -9,6 +9,7 @@ import {
   shouldEnforceQuota,
 } from "../../../server/storage";
 import { qmdClient, streamToString } from "../../plugins/handlers/qmd-client";
+import { resolvePluginEndpoint } from "../../plugins/resolve-endpoint";
 import { invalidateWorkspaceVfsSnapshot } from "../../vfs/locker-vfs";
 import {
   initiateUploadSchema,
@@ -188,21 +189,32 @@ export const uploadsRouter = createRouter({
         .where(eq(workspaces.id, workspaceId));
 
       // Fire-and-forget: index file for QMD search
-      if (qmdClient.isConfigured() && qmdClient.shouldIndex(file.mimeType)) {
+      if (qmdClient.shouldIndex(file.mimeType)) {
         void (async () => {
           try {
-            if (!(await qmdClient.isActiveForWorkspace(db, workspaceId)))
-              return;
+            const endpoint = await resolvePluginEndpoint(
+              db,
+              workspaceId,
+              "qmd-search",
+              {
+                serviceUrl: process.env.QMD_SERVICE_URL,
+                apiSecret: process.env.QMD_API_SECRET,
+              },
+            );
+            if (!endpoint) return;
             const storage = await createStorageForFile(file.storageConfigId);
             const { data } = await storage.download(file.storagePath);
             const content = await streamToString(data);
-            await qmdClient.indexFile({
-              workspaceId,
-              fileId: input.fileId,
-              fileName: file.name,
-              mimeType: file.mimeType,
-              content,
-            });
+            await qmdClient.indexFile(
+              {
+                workspaceId,
+                fileId: input.fileId,
+                fileName: file.name,
+                mimeType: file.mimeType,
+                content,
+              },
+              endpoint,
+            );
           } catch {}
         })();
       }

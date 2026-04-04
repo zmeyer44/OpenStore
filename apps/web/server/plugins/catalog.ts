@@ -22,7 +22,24 @@ const builtinPluginManifestsRaw: PluginManifest[] = [
         requiresPermissions: ["files.read", "search.enhance"],
       },
     ],
-    configFields: [],
+    configFields: [
+      {
+        key: "serviceUrl",
+        label: "Service URL",
+        description:
+          "Custom endpoint URL for the QMD service. Falls back to the QMD_SERVICE_URL environment variable when empty.",
+        type: "url",
+        required: false,
+      },
+      {
+        key: "apiSecret",
+        label: "API Secret",
+        description:
+          "Authentication secret for the QMD service. Falls back to the QMD_API_SECRET environment variable when empty.",
+        type: "secret",
+        required: false,
+      },
+    ],
   },
   {
     slug: "fts-search",
@@ -44,7 +61,24 @@ const builtinPluginManifestsRaw: PluginManifest[] = [
         requiresPermissions: ["files.read", "search.enhance"],
       },
     ],
-    configFields: [],
+    configFields: [
+      {
+        key: "serviceUrl",
+        label: "Service URL",
+        description:
+          "Custom endpoint URL for the FTS service. Falls back to the FTS_SERVICE_URL environment variable when empty.",
+        type: "url",
+        required: false,
+      },
+      {
+        key: "apiSecret",
+        label: "API Secret",
+        description:
+          "Authentication secret for the FTS service. Falls back to the FTS_API_SECRET environment variable when empty.",
+        type: "secret",
+        required: false,
+      },
+    ],
   },
   {
     slug: "google-drive-sync",

@@ -2,6 +2,11 @@ import { and, eq } from "drizzle-orm";
 import { workspacePlugins } from "@locker/database";
 import type { Database } from "@locker/database";
 
+export interface EndpointConfig {
+  serviceUrl?: string;
+  apiSecret?: string;
+}
+
 const FTS_SERVICE_URL = process.env.FTS_SERVICE_URL;
 const FTS_API_SECRET = process.env.FTS_API_SECRET;
 
@@ -18,12 +23,12 @@ function shouldIndex(mimeType: string): boolean {
   return INDEXABLE_TYPES.has(mimeType);
 }
 
-function authHeaders(): Record<string, string> {
+function buildHeaders(secret?: string): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (FTS_API_SECRET) {
-    headers["Authorization"] = `Bearer ${FTS_API_SECRET}`;
+  if (secret) {
+    headers["Authorization"] = `Bearer ${secret}`;
   }
   return headers;
 }
@@ -53,18 +58,23 @@ export const ftsClient = {
     return !!row;
   },
 
-  async indexFile(params: {
-    workspaceId: string;
-    fileId: string;
-    fileName: string;
-    mimeType: string;
-    content: string;
-  }): Promise<void> {
-    if (!FTS_SERVICE_URL) return;
+  async indexFile(
+    params: {
+      workspaceId: string;
+      fileId: string;
+      fileName: string;
+      mimeType: string;
+      content: string;
+    },
+    endpoint?: EndpointConfig,
+  ): Promise<void> {
+    const url = endpoint?.serviceUrl ?? FTS_SERVICE_URL;
+    if (!url) return;
 
-    const res = await fetch(`${FTS_SERVICE_URL}/index`, {
+    const secret = endpoint?.apiSecret ?? FTS_API_SECRET;
+    const res = await fetch(`${url}/index`, {
       method: "POST",
-      headers: authHeaders(),
+      headers: buildHeaders(secret),
       body: JSON.stringify(params),
       signal: AbortSignal.timeout(30_000),
     });
@@ -75,16 +85,21 @@ export const ftsClient = {
     }
   },
 
-  async search(params: {
-    workspaceId: string;
-    query: string;
-    limit?: number;
-  }): Promise<Array<{ fileId: string; score: number; snippet?: string }>> {
-    if (!FTS_SERVICE_URL) return [];
+  async search(
+    params: {
+      workspaceId: string;
+      query: string;
+      limit?: number;
+    },
+    endpoint?: EndpointConfig,
+  ): Promise<Array<{ fileId: string; score: number; snippet?: string }>> {
+    const url = endpoint?.serviceUrl ?? FTS_SERVICE_URL;
+    if (!url) return [];
 
-    const res = await fetch(`${FTS_SERVICE_URL}/search`, {
+    const secret = endpoint?.apiSecret ?? FTS_API_SECRET;
+    const res = await fetch(`${url}/search`, {
       method: "POST",
-      headers: authHeaders(),
+      headers: buildHeaders(secret),
       body: JSON.stringify(params),
       signal: AbortSignal.timeout(5_000),
     });
@@ -96,15 +111,20 @@ export const ftsClient = {
     return data.results ?? [];
   },
 
-  async deindexFile(params: {
-    workspaceId: string;
-    fileId: string;
-  }): Promise<void> {
-    if (!FTS_SERVICE_URL) return;
+  async deindexFile(
+    params: {
+      workspaceId: string;
+      fileId: string;
+    },
+    endpoint?: EndpointConfig,
+  ): Promise<void> {
+    const url = endpoint?.serviceUrl ?? FTS_SERVICE_URL;
+    if (!url) return;
 
-    await fetch(`${FTS_SERVICE_URL}/deindex`, {
+    const secret = endpoint?.apiSecret ?? FTS_API_SECRET;
+    await fetch(`${url}/deindex`, {
       method: "POST",
-      headers: authHeaders(),
+      headers: buildHeaders(secret),
       body: JSON.stringify(params),
       signal: AbortSignal.timeout(5_000),
     });

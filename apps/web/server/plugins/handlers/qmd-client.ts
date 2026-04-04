@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { workspacePlugins } from "@locker/database";
 import type { Database } from "@locker/database";
+import type { EndpointConfig } from "./fts-client";
 
 const QMD_SERVICE_URL = process.env.QMD_SERVICE_URL;
 const QMD_API_SECRET = process.env.QMD_API_SECRET;
@@ -20,12 +21,12 @@ function shouldIndex(mimeType: string): boolean {
   return INDEXABLE_TYPES.has(mimeType);
 }
 
-function authHeaders(): Record<string, string> {
+function buildHeaders(secret?: string): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (QMD_API_SECRET) {
-    headers["Authorization"] = `Bearer ${QMD_API_SECRET}`;
+  if (secret) {
+    headers["Authorization"] = `Bearer ${secret}`;
   }
   return headers;
 }
@@ -78,18 +79,23 @@ export const qmdClient = {
     return !!row;
   },
 
-  async indexFile(params: {
-    workspaceId: string;
-    fileId: string;
-    fileName: string;
-    mimeType: string;
-    content: string;
-  }): Promise<void> {
-    if (!QMD_SERVICE_URL) return;
+  async indexFile(
+    params: {
+      workspaceId: string;
+      fileId: string;
+      fileName: string;
+      mimeType: string;
+      content: string;
+    },
+    endpoint?: EndpointConfig,
+  ): Promise<void> {
+    const url = endpoint?.serviceUrl ?? QMD_SERVICE_URL;
+    if (!url) return;
 
-    const res = await fetch(`${QMD_SERVICE_URL}/index`, {
+    const secret = endpoint?.apiSecret ?? QMD_API_SECRET;
+    const res = await fetch(`${url}/index`, {
       method: "POST",
-      headers: authHeaders(),
+      headers: buildHeaders(secret),
       body: JSON.stringify(params),
       signal: AbortSignal.timeout(30_000),
     });
@@ -100,16 +106,21 @@ export const qmdClient = {
     }
   },
 
-  async search(params: {
-    workspaceId: string;
-    query: string;
-    limit?: number;
-  }): Promise<Array<{ fileId: string; score: number; snippet?: string }>> {
-    if (!QMD_SERVICE_URL) return [];
+  async search(
+    params: {
+      workspaceId: string;
+      query: string;
+      limit?: number;
+    },
+    endpoint?: EndpointConfig,
+  ): Promise<Array<{ fileId: string; score: number; snippet?: string }>> {
+    const url = endpoint?.serviceUrl ?? QMD_SERVICE_URL;
+    if (!url) return [];
 
-    const res = await fetch(`${QMD_SERVICE_URL}/search`, {
+    const secret = endpoint?.apiSecret ?? QMD_API_SECRET;
+    const res = await fetch(`${url}/search`, {
       method: "POST",
-      headers: authHeaders(),
+      headers: buildHeaders(secret),
       body: JSON.stringify(params),
       signal: AbortSignal.timeout(15_000),
     });
@@ -121,15 +132,20 @@ export const qmdClient = {
     return data.results ?? [];
   },
 
-  async deindexFile(params: {
-    workspaceId: string;
-    fileId: string;
-  }): Promise<void> {
-    if (!QMD_SERVICE_URL) return;
+  async deindexFile(
+    params: {
+      workspaceId: string;
+      fileId: string;
+    },
+    endpoint?: EndpointConfig,
+  ): Promise<void> {
+    const url = endpoint?.serviceUrl ?? QMD_SERVICE_URL;
+    if (!url) return;
 
-    await fetch(`${QMD_SERVICE_URL}/deindex`, {
+    const secret = endpoint?.apiSecret ?? QMD_API_SECRET;
+    await fetch(`${url}/deindex`, {
       method: "POST",
-      headers: authHeaders(),
+      headers: buildHeaders(secret),
       body: JSON.stringify(params),
       signal: AbortSignal.timeout(5_000),
     });

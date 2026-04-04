@@ -1,6 +1,7 @@
 import { createStorageForFile } from "../../storage";
 import { getBuiltinPluginBySlug } from "../catalog";
 import { qmdClient, streamToString } from "./qmd-client";
+import type { EndpointConfig } from "./fts-client";
 import type {
   PluginHandler,
   PluginContext,
@@ -11,6 +12,13 @@ import type {
 
 const manifest = getBuiltinPluginBySlug("qmd-search")!;
 
+function endpointFromCtx(ctx: PluginContext): EndpointConfig {
+  return {
+    serviceUrl: (ctx.config.serviceUrl as string) || undefined,
+    apiSecret: ctx.secrets.apiSecret || undefined,
+  };
+}
+
 export const qmdSearchHandler: PluginHandler = {
   manifest,
 
@@ -20,7 +28,8 @@ export const qmdSearchHandler: PluginHandler = {
     target: ActionTarget,
   ): Promise<ActionResult> {
     if (actionId === "qmd.reindex-file" && target.type === "file") {
-      if (!qmdClient.isConfigured()) {
+      const endpoint = endpointFromCtx(ctx);
+      if (!endpoint.serviceUrl && !qmdClient.isConfigured()) {
         return {
           status: "success",
           message: "QMD service is not configured",
@@ -51,13 +60,16 @@ export const qmdSearchHandler: PluginHandler = {
           const { data } = await storage.download(file.storagePath);
           const content = await streamToString(data);
 
-          await qmdClient.indexFile({
-            workspaceId: ctx.workspaceId,
-            fileId: target.id,
-            fileName: target.name,
-            mimeType: file.mimeType,
-            content,
-          });
+          await qmdClient.indexFile(
+            {
+              workspaceId: ctx.workspaceId,
+              fileId: target.id,
+              fileName: target.name,
+              mimeType: file.mimeType,
+              content,
+            },
+            endpoint,
+          );
         }
       } catch {
         // Best-effort indexing
@@ -79,14 +91,19 @@ export const qmdSearchHandler: PluginHandler = {
     ctx: PluginContext,
     params: { query: string; folderId?: string | null; limit?: number },
   ): Promise<SearchResult[]> {
+    const endpoint = endpointFromCtx(ctx);
+
     // Use the QMD service if configured
-    if (qmdClient.isConfigured()) {
+    if (endpoint.serviceUrl || qmdClient.isConfigured()) {
       try {
-        return await qmdClient.search({
-          workspaceId: ctx.workspaceId,
-          query: params.query,
-          limit: params.limit ?? 20,
-        });
+        return await qmdClient.search(
+          {
+            workspaceId: ctx.workspaceId,
+            query: params.query,
+            limit: params.limit ?? 20,
+          },
+          endpoint,
+        );
       } catch {
         // Fall through to filename scoring
       }

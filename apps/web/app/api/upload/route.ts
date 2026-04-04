@@ -17,6 +17,7 @@ import {
   streamToString,
 } from "../../../server/plugins/handlers/qmd-client";
 import { ftsClient } from "../../../server/plugins/handlers/fts-client";
+import { resolvePluginEndpoint } from "../../../server/plugins/resolve-endpoint";
 import { invalidateWorkspaceVfsSnapshot } from "../../../server/vfs/locker-vfs";
 
 export async function POST(req: NextRequest) {
@@ -253,36 +254,60 @@ export async function POST(req: NextRequest) {
       }
 
       // QMD semantic search
-      if (qmdClient.isConfigured() && qmdClient.shouldIndex(uploadedFile.mimeType)) {
+      if (qmdClient.shouldIndex(uploadedFile.mimeType)) {
         try {
-          if (await qmdClient.isActiveForWorkspace(db, workspaceId)) {
+          const qmdEndpoint = await resolvePluginEndpoint(
+            db,
+            workspaceId,
+            "qmd-search",
+            {
+              serviceUrl: process.env.QMD_SERVICE_URL,
+              apiSecret: process.env.QMD_API_SECRET,
+            },
+          );
+          if (qmdEndpoint) {
             const text = await getContent();
             if (text) {
-              await qmdClient.indexFile({
-                workspaceId,
-                fileId: uploadedFile.id,
-                fileName: uploadedFile.name,
-                mimeType: uploadedFile.mimeType,
-                content: text,
-              });
+              await qmdClient.indexFile(
+                {
+                  workspaceId,
+                  fileId: uploadedFile.id,
+                  fileName: uploadedFile.name,
+                  mimeType: uploadedFile.mimeType,
+                  content: text,
+                },
+                qmdEndpoint,
+              );
             }
           }
         } catch {}
       }
 
       // FTS5 full-text search
-      if (ftsClient.isConfigured() && ftsClient.shouldIndex(uploadedFile.mimeType)) {
+      if (ftsClient.shouldIndex(uploadedFile.mimeType)) {
         try {
-          if (await ftsClient.isActiveForWorkspace(db, workspaceId)) {
+          const ftsEndpoint = await resolvePluginEndpoint(
+            db,
+            workspaceId,
+            "fts-search",
+            {
+              serviceUrl: process.env.FTS_SERVICE_URL,
+              apiSecret: process.env.FTS_API_SECRET,
+            },
+          );
+          if (ftsEndpoint) {
             const text = await getContent();
             if (text) {
-              await ftsClient.indexFile({
-                workspaceId,
-                fileId: uploadedFile.id,
-                fileName: uploadedFile.name,
-                mimeType: uploadedFile.mimeType,
-                content: text,
-              });
+              await ftsClient.indexFile(
+                {
+                  workspaceId,
+                  fileId: uploadedFile.id,
+                  fileName: uploadedFile.name,
+                  mimeType: uploadedFile.mimeType,
+                  content: text,
+                },
+                ftsEndpoint,
+              );
             }
           }
         } catch {}

@@ -1,9 +1,23 @@
-import { z } from 'zod';
-import { eq, and } from 'drizzle-orm';
-import { randomBytes } from 'crypto';
-import { createRouter, protectedProcedure, workspaceProcedure, workspaceAdminProcedure } from '../init';
-import { workspaces, workspaceMembers } from '@locker/database';
-import { createWorkspaceSchema, updateWorkspaceSchema, generateSlug } from '@locker/common';
+import { z } from "zod";
+import { eq, and } from "drizzle-orm";
+import { randomBytes } from "crypto";
+import {
+  createRouter,
+  protectedProcedure,
+  workspaceProcedure,
+  workspaceAdminProcedure,
+} from "../init";
+import {
+  workspaces,
+  workspaceMembers,
+  workspacePlugins,
+} from "@locker/database";
+import {
+  createWorkspaceSchema,
+  updateWorkspaceSchema,
+  generateSlug,
+} from "@locker/common";
+import { getBuiltinPluginBySlug } from "../../plugins/catalog";
 
 export const workspacesRouter = createRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -68,13 +82,13 @@ export const workspacesRouter = createRouter({
           break;
         }
 
-        const suffix = randomBytes(3).toString('hex');
+        const suffix = randomBytes(3).toString("hex");
         const maxBaseLength = Math.max(1, 48 - suffix.length - 1);
         slug = `${baseSlug.slice(0, maxBaseLength)}-${suffix}`;
       }
 
       if (collision) {
-        throw new Error('Unable to generate a unique workspace slug');
+        throw new Error("Unable to generate a unique workspace slug");
       }
 
       const [workspace] = await ctx.db
@@ -90,8 +104,23 @@ export const workspacesRouter = createRouter({
       await ctx.db.insert(workspaceMembers).values({
         workspaceId: workspace!.id,
         userId: ctx.userId,
-        role: 'owner',
+        role: "owner",
       });
+
+      // Auto-install FTS search plugin
+      const ftsManifest = getBuiltinPluginBySlug("fts-search");
+      if (ftsManifest) {
+        await ctx.db.insert(workspacePlugins).values({
+          workspaceId: workspace!.id,
+          installedById: ctx.userId,
+          pluginSlug: ftsManifest.slug,
+          source: ftsManifest.source,
+          manifest: ftsManifest,
+          grantedPermissions: ftsManifest.permissions,
+          config: {},
+          status: "active",
+        });
+      }
 
       return workspace!;
     }),
@@ -107,14 +136,10 @@ export const workspacesRouter = createRouter({
         const existing = await ctx.db
           .select({ id: workspaces.id })
           .from(workspaces)
-          .where(
-            and(
-              eq(workspaces.slug, input.slug),
-            ),
-          );
+          .where(and(eq(workspaces.slug, input.slug)));
 
         if (existing.length > 0 && existing[0]!.id !== ctx.workspaceId) {
-          throw new Error('Slug already taken');
+          throw new Error("Slug already taken");
         }
         updates.slug = input.slug;
       }
@@ -131,8 +156,8 @@ export const workspacesRouter = createRouter({
   delete: workspaceAdminProcedure
     .input(z.object({ confirm: z.literal(true) }))
     .mutation(async ({ ctx }) => {
-      if (ctx.workspaceRole !== 'owner') {
-        throw new Error('Only the workspace owner can delete it');
+      if (ctx.workspaceRole !== "owner") {
+        throw new Error("Only the workspace owner can delete it");
       }
 
       await ctx.db.delete(workspaces).where(eq(workspaces.id, ctx.workspaceId));
