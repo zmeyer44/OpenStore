@@ -82,17 +82,20 @@ export function FileExplorer({ folderId }: { folderId: string | null }) {
     folderId,
   });
 
-  const { data: folderList } = trpc.folders.list.useQuery({
-    parentId: folderId,
-  });
+  const { data: folderList, isLoading: foldersLoading } =
+    trpc.folders.list.useQuery({
+      parentId: folderId,
+    });
 
-  const { data: fileList } = trpc.files.list.useQuery({
+  const { data: fileList, isLoading: filesLoading } = trpc.files.list.useQuery({
     folderId,
     page: 1,
     pageSize: 100,
     field: "name",
     direction: "asc",
   });
+
+  const isLoading = foldersLoading || filesLoading;
 
   const deleteFile = trpc.files.delete.useMutation({
     onSuccess: () => {
@@ -245,7 +248,43 @@ export function FileExplorer({ folderId }: { folderId: string | null }) {
       {/* Content */}
       <div className="p-6">
         {/* File List */}
-        {isEmpty ? (
+        {isLoading ? (
+          <div className="rounded-lg border bg-card overflow-hidden">
+            <div className="grid grid-cols-[1fr_40px] sm:grid-cols-[1fr_100px_140px_40px] gap-4 px-4 py-2 border-b bg-muted/50">
+              <span className="text-xs font-medium text-muted-foreground">
+                Name
+              </span>
+              <span className="hidden sm:block text-xs font-medium text-muted-foreground">
+                Size
+              </span>
+              <span className="hidden sm:block text-xs font-medium text-muted-foreground">
+                Modified
+              </span>
+              <span />
+            </div>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="grid grid-cols-[1fr_40px] sm:grid-cols-[1fr_100px_140px_40px] gap-4 px-4 py-2.5 border-b last:border-b-0"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="size-4 rounded bg-muted animate-pulse" />
+                  <div
+                    className="h-4 rounded bg-muted animate-pulse"
+                    style={{ width: `${40 + ((i * 23) % 40)}%` }}
+                  />
+                </div>
+                <div className="hidden sm:block">
+                  <div className="h-4 w-14 rounded bg-muted animate-pulse" />
+                </div>
+                <div className="hidden sm:block">
+                  <div className="h-4 w-20 rounded bg-muted animate-pulse" />
+                </div>
+                <div />
+              </div>
+            ))}
+          </div>
+        ) : isEmpty ? (
           <div className="rounded-lg border bg-card flex flex-col items-center justify-center py-20 text-center">
             <div className="size-12 rounded-full bg-muted flex items-center justify-center mb-4">
               <Upload className="size-5 text-muted-foreground" />
