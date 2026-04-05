@@ -14,7 +14,14 @@ export async function POST(req: NextRequest) {
 
   const contentType = req.headers.get("content-type") ?? "";
   const fileName = req.headers.get("x-file-name") ?? "file";
-  const model = req.headers.get("x-model") ?? undefined;
+
+  const ALLOWED_MODELS = new Set([
+    "openai/gpt-4o",
+    "openai/gpt-4o-mini",
+    "anthropic/claude-sonnet-4-20250514",
+  ]);
+  const rawModel = req.headers.get("x-model");
+  const model = rawModel && ALLOWED_MODELS.has(rawModel) ? rawModel : undefined;
 
   const isImage = contentType.startsWith("image/");
   const isPdf = contentType === "application/pdf";

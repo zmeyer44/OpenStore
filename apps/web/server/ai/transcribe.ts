@@ -19,6 +19,13 @@ export async function transcribeWithAI(params: {
   model?: string;
 }): Promise<string> {
   const { buffer, fileName, mimeType, model } = params;
+
+  if (!process.env.AI_GATEWAY_API_KEY) {
+    throw new Error(
+      "AI_GATEWAY_API_KEY is not configured. Set it in your environment to use the built-in transcription.",
+    );
+  }
+
   const modelId = model || process.env.AI_GATEWAY_MODEL || DEFAULT_MODEL;
 
   const isImage = mimeType.startsWith("image/");

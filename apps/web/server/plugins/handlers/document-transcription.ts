@@ -87,7 +87,22 @@ export const documentTranscriptionHandler: PluginHandler = {
     const buffer = await streamToBuffer(data);
     const model = (ctx.config.model as string) || undefined;
 
-    const serviceUrl = (ctx.config.serviceUrl as string) || undefined;
+    const rawServiceUrl = (ctx.config.serviceUrl as string) || undefined;
+    let serviceUrl: string | undefined;
+    if (rawServiceUrl) {
+      let parsed: URL | null = null;
+      try {
+        parsed = new URL(rawServiceUrl);
+      } catch {
+        /* invalid */
+      }
+      if (!parsed || !["http:", "https:"].includes(parsed.protocol)) {
+        throw new Error(
+          `Invalid serviceUrl: must be an http or https URL, got "${rawServiceUrl}"`,
+        );
+      }
+      serviceUrl = rawServiceUrl;
+    }
 
     // If no external service URL is configured, use the built-in AI Gateway
     if (!serviceUrl) {
