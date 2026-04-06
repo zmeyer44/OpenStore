@@ -10,6 +10,8 @@ import {
   inArray,
   not,
   or,
+  gte,
+  lt,
 } from "drizzle-orm";
 import { createRouter, workspaceProcedure } from "../init";
 import { files, workspaces, folders, fileTags, tags } from "@locker/database";
@@ -50,6 +52,8 @@ export const filesRouter = createRouter({
             ]),
           )
           .optional(),
+        createdAfter: z.string().date().optional(),
+        createdBefore: z.string().date().optional(),
         ...paginationSchema.shape,
         ...sortSchema.shape,
       }),
@@ -61,6 +65,8 @@ export const filesRouter = createRouter({
         search,
         tagSlugs,
         fileTypes,
+        createdAfter,
+        createdBefore,
         page,
         pageSize,
         field,
@@ -199,6 +205,16 @@ export const filesRouter = createRouter({
         } else if (includeOther) {
           conditions.push(not(inArray(files.mimeType, allKnownMimeTypes)));
         }
+      }
+
+      // Date filtering (inclusive range on createdAt)
+      if (createdAfter) {
+        conditions.push(gte(files.createdAt, new Date(createdAfter)));
+      }
+      if (createdBefore) {
+        const endOfDay = new Date(createdBefore);
+        endOfDay.setDate(endOfDay.getDate() + 1);
+        conditions.push(lt(files.createdAt, endOfDay));
       }
 
       const orderBy =

@@ -2,6 +2,7 @@
 
 import { useMemo, useCallback } from "react";
 import { X } from "lucide-react";
+import { format } from "date-fns";
 import {
   Popover,
   PopoverContent,
@@ -9,6 +10,7 @@ import {
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { FilterValuePicker } from "./filter-value-picker";
+import { DateValuePicker } from "./date-value-picker";
 import type { FilterColumnDef } from "./types";
 
 export function ActiveFilter({
@@ -24,18 +26,26 @@ export function ActiveFilter({
 }) {
   const Icon = column.icon;
 
-  const selectedOptions = useMemo(
-    () => column.options.filter((o) => values.includes(o.value)),
-    [column.options, values],
-  );
-
   const displayText = useMemo(() => {
-    if (selectedOptions.length === 0) return "None";
+    if (values.length === 0) return "None";
+
+    if (column.type === "date") {
+      if (values.length === 1) {
+        return format(new Date(values[0] + "T00:00:00"), "MMM d, yyyy");
+      }
+      const from = format(new Date(values[0] + "T00:00:00"), "MMM d");
+      const to = format(new Date(values[1] + "T00:00:00"), "MMM d, yyyy");
+      return `${from} – ${to}`;
+    }
+
+    const selectedOptions = column.options.filter((o) =>
+      values.includes(o.value),
+    );
     if (selectedOptions.length <= 2) {
       return selectedOptions.map((o) => o.label).join(", ");
     }
     return `${selectedOptions.length} selected`;
-  }, [selectedOptions]);
+  }, [column, values]);
 
   const handleToggle = useCallback(
     (value: string) => {
@@ -54,7 +64,7 @@ export function ActiveFilter({
           <Icon className="size-3.5 text-muted-foreground" />
           <span className="text-muted-foreground">{column.label}</span>
           <Separator orientation="vertical" className="mx-0.5 h-4" />
-          <span className="max-w-32 truncate">{displayText}</span>
+          <span className="max-w-40 truncate">{displayText}</span>
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -66,13 +76,23 @@ export function ActiveFilter({
           </button>
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start">
-        <FilterValuePicker
-          options={column.options}
-          selectedValues={values}
-          onToggle={handleToggle}
-          placeholder={`Search ${column.label.toLowerCase()}...`}
-        />
+      <PopoverContent
+        align="start"
+        className={column.type === "date" ? "w-auto" : undefined}
+      >
+        {column.type === "date" ? (
+          <DateValuePicker
+            selectedValues={values}
+            onChange={onValuesChange}
+          />
+        ) : (
+          <FilterValuePicker
+            options={column.options}
+            selectedValues={values}
+            onToggle={handleToggle}
+            placeholder={`Search ${column.label.toLowerCase()}...`}
+          />
+        )}
       </PopoverContent>
     </Popover>
   );

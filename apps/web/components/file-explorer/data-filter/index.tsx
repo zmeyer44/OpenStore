@@ -6,7 +6,13 @@ import { ActiveFilter } from "./active-filter";
 import { FilterActions } from "./filter-actions";
 import type { ActiveFilters as ActiveFiltersType } from "./types";
 
-export type { FilterColumnDef, FilterOption, ActiveFilters } from "./types";
+export type {
+  FilterColumnDef,
+  OptionFilterColumnDef,
+  DateFilterColumnDef,
+  FilterOption,
+  ActiveFilters,
+} from "./types";
 
 export function DataFilter({
   columns,

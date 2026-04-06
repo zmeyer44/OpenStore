@@ -9,6 +9,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { FilterValuePicker } from "./filter-value-picker";
+import { DateValuePicker } from "./date-value-picker";
 import type { FilterColumnDef, ActiveFilters } from "./types";
 
 export function FilterSelector({
@@ -60,7 +61,10 @@ export function FilterSelector({
           Filter
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start">
+      <PopoverContent
+        align="start"
+        className={selectedColumn?.type === "date" ? "w-auto" : undefined}
+      >
         {selectedColumn ? (
           <div>
             <button
@@ -71,12 +75,21 @@ export function FilterSelector({
               {selectedColumn.label}
             </button>
             <div className="h-px bg-border/50" />
-            <FilterValuePicker
-              options={selectedColumn.options}
-              selectedValues={activeFilters[selectedColumn.id] ?? []}
-              onToggle={(value) => handleToggle(selectedColumn.id, value)}
-              placeholder={`Search ${selectedColumn.label.toLowerCase()}...`}
-            />
+            {selectedColumn.type === "date" ? (
+              <DateValuePicker
+                selectedValues={activeFilters[selectedColumn.id] ?? []}
+                onChange={(values) =>
+                  onFilterChange(selectedColumn.id, values)
+                }
+              />
+            ) : (
+              <FilterValuePicker
+                options={selectedColumn.options}
+                selectedValues={activeFilters[selectedColumn.id] ?? []}
+                onToggle={(value) => handleToggle(selectedColumn.id, value)}
+                placeholder={`Search ${selectedColumn.label.toLowerCase()}...`}
+              />
+            )}
           </div>
         ) : (
           <div>

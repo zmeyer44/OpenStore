@@ -19,6 +19,7 @@ import {
   Loader2,
   Tag,
   File as FileLucide,
+  CalendarDays,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { formatBytes, formatDate } from "@/lib/utils";
@@ -93,6 +94,10 @@ export function FileExplorer({ folderId }: { folderId: string | null }) {
     "type",
     parseAsArrayOf(parseAsString).withDefault([]),
   );
+  const [selectedDates, setSelectedDates] = useQueryState(
+    "date",
+    parseAsArrayOf(parseAsString).withDefault([]),
+  );
 
   const utils = trpc.useUtils();
   const { handleDrop } = useFileDrop();
@@ -126,6 +131,13 @@ export function FileExplorer({ folderId }: { folderId: string | null }) {
             | "other"
           )[])
         : undefined,
+    createdAfter: selectedDates.length > 0 ? selectedDates[0] : undefined,
+    createdBefore:
+      selectedDates.length > 1
+        ? selectedDates[1]
+        : selectedDates.length > 0
+          ? selectedDates[0]
+          : undefined,
   });
 
   const isLoading = foldersLoading || filesLoading;
@@ -230,6 +242,7 @@ export function FileExplorer({ folderId }: { folderId: string | null }) {
     const cols: FilterColumnDef[] = [
       {
         id: "type",
+        type: "option",
         label: "File Type",
         icon: FileLucide,
         options: [
@@ -241,10 +254,17 @@ export function FileExplorer({ folderId }: { folderId: string | null }) {
           { label: "Other", value: "other" },
         ],
       },
+      {
+        id: "date",
+        type: "date",
+        label: "Upload Date",
+        icon: CalendarDays,
+      },
     ];
     if (allTags.length > 0) {
       cols.push({
         id: "tags",
+        type: "option",
         label: "Tags",
         icon: Tag,
         options: allTags.map((t) => ({
@@ -315,17 +335,21 @@ export function FileExplorer({ folderId }: { folderId: string | null }) {
             activeFilters={{
               tags: selectedTagIds,
               type: selectedFileTypes,
+              date: selectedDates,
             }}
             onFilterChange={(columnId, values) => {
               if (columnId === "tags") {
                 setSelectedTagIds(values.length > 0 ? values : null);
               } else if (columnId === "type") {
                 setSelectedFileTypes(values.length > 0 ? values : null);
+              } else if (columnId === "date") {
+                setSelectedDates(values.length > 0 ? values : null);
               }
             }}
             onClearAll={() => {
               setSelectedTagIds(null);
               setSelectedFileTypes(null);
+              setSelectedDates(null);
             }}
           />
         </div>
