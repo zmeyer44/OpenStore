@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 
 export function TagFilterBar({
   tags,
-  selectedTagIds,
+  selectedSlugs,
   onToggle,
   onClear,
 }: {
-  tags: { id: string; name: string; color: string | null }[];
-  selectedTagIds: string[];
-  onToggle: (tagId: string) => void;
+  tags: { id: string; slug: string; name: string; color: string | null }[];
+  selectedSlugs: string[];
+  onToggle: (slug: string) => void;
   onClear: () => void;
 }) {
   if (tags.length === 0) return null;
@@ -20,12 +20,12 @@ export function TagFilterBar({
     <div className="flex items-center gap-2 overflow-x-auto py-1">
       <span className="text-xs text-muted-foreground shrink-0">Filter:</span>
       {tags.map((tag) => {
-        const isActive = selectedTagIds.includes(tag.id);
+        const isActive = selectedSlugs.includes(tag.slug);
         const color = tag.color ?? "#6b7280";
         return (
           <button
             key={tag.id}
-            onClick={() => onToggle(tag.id)}
+            onClick={() => onToggle(tag.slug)}
             className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors shrink-0"
             style={
               isActive
@@ -45,7 +45,7 @@ export function TagFilterBar({
           </button>
         );
       })}
-      {selectedTagIds.length > 0 && (
+      {selectedSlugs.length > 0 && (
         <Button
           variant="ghost"
           size="sm"

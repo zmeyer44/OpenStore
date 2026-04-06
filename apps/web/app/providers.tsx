@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { trpc } from "@/lib/trpc/client";
 import dynamic from "next/dynamic";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 
 const GoogleAnalytics = dynamic(
   () =>
@@ -57,14 +58,16 @@ export function Providers({ children }: { children: ReactNode }) {
   );
 
   return (
-    <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider delayDuration={150}>
-          {children}
-          <Toaster position="bottom-right" />
-        </TooltipProvider>
-        <GoogleAnalytics />
-      </QueryClientProvider>
-    </trpc.Provider>
+    <NuqsAdapter>
+      <trpc.Provider client={trpcClient} queryClient={queryClient}>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider delayDuration={150}>
+            {children}
+            <Toaster position="bottom-right" />
+          </TooltipProvider>
+          <GoogleAnalytics />
+        </QueryClientProvider>
+      </trpc.Provider>
+    </NuqsAdapter>
   );
 }

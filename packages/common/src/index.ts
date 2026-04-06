@@ -101,4 +101,5 @@ export {
   deleteTagSchema,
   setFileTagsSchema,
   generateSlug,
+  generateTagSlug,
 } from "./validation";

@@ -7,6 +7,7 @@ import {
   updateTagSchema,
   deleteTagSchema,
   setFileTagsSchema,
+  generateTagSlug,
 } from "@locker/common";
 import { TRPCError } from "@trpc/server";
 
@@ -28,6 +29,7 @@ export const tagsRouter = createRouter({
           .values({
             workspaceId: ctx.workspaceId,
             name: input.name,
+            slug: generateTagSlug(input.name),
             color: input.color,
           })
           .returning();
@@ -48,7 +50,10 @@ export const tagsRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       const { id, ...updates } = input;
       const set: Record<string, unknown> = { updatedAt: new Date() };
-      if (updates.name !== undefined) set.name = updates.name;
+      if (updates.name !== undefined) {
+        set.name = updates.name;
+        set.slug = generateTagSlug(updates.name);
+      }
       if (updates.color !== undefined) set.color = updates.color;
 
       try {
@@ -146,6 +151,7 @@ export const tagsRouter = createRouter({
         .select({
           id: tags.id,
           name: tags.name,
+          slug: tags.slug,
           color: tags.color,
         })
         .from(fileTags)
@@ -162,6 +168,7 @@ export const tagsRouter = createRouter({
         .select({
           id: tags.id,
           name: tags.name,
+          slug: tags.slug,
           color: tags.color,
         })
         .from(fileTags)
@@ -186,6 +193,7 @@ export const tagsRouter = createRouter({
           fileId: fileTags.fileId,
           tagId: tags.id,
           tagName: tags.name,
+          tagSlug: tags.slug,
           tagColor: tags.color,
         })
         .from(fileTags)
@@ -201,13 +209,14 @@ export const tagsRouter = createRouter({
 
       const result: Record<
         string,
-        { id: string; name: string; color: string | null }[]
+        { id: string; name: string; slug: string; color: string | null }[]
       > = {};
       for (const row of rows) {
         if (!result[row.fileId]) result[row.fileId] = [];
         result[row.fileId].push({
           id: row.tagId,
           name: row.tagName,
+          slug: row.tagSlug,
           color: row.tagColor,
         });
       }

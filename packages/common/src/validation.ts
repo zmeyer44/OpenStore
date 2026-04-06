@@ -202,3 +202,17 @@ export function generateSlug(name: string): string {
 
   return slug || "workspace";
 }
+
+export function generateTagSlug(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 100)
+    .replace(/^-+|-+$/g, "");
+
+  return slug || "tag";
+}

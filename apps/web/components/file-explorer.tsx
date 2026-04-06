@@ -43,6 +43,7 @@ import { DesktopDropOverlay } from "@/components/desktop-drop-overlay";
 import { useFileDrop } from "@/hooks/use-file-drop";
 import { useFileDownload } from "@/hooks/use-file-download";
 import { useWorkspace } from "@/lib/workspace-context";
+import { parseAsArrayOf, parseAsString, useQueryState } from "nuqs";
 import { isTextIndexable } from "@locker/common";
 import { TagBadge } from "@/components/tag-badge";
 import { FileTagsDialog } from "@/components/file-tags-dialog";
@@ -80,7 +81,10 @@ export function FileExplorer({ folderId }: { folderId: string | null }) {
     name: string;
   } | null>(null);
   const [tagTarget, setTagTarget] = useState<string | null>(null);
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useQueryState(
+    "tags",
+    parseAsArrayOf(parseAsString).withDefault([]),
+  );
 
   const utils = trpc.useUtils();
   const { handleDrop } = useFileDrop();
@@ -102,7 +106,7 @@ export function FileExplorer({ folderId }: { folderId: string | null }) {
     pageSize: 100,
     field: "name",
     direction: "asc",
-    tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+    tagSlugs: selectedTagIds.length > 0 ? selectedTagIds : undefined,
   });
 
   const isLoading = foldersLoading || filesLoading;
@@ -258,15 +262,15 @@ export function FileExplorer({ folderId }: { folderId: string | null }) {
         <div className="px-6 pt-4">
           <TagFilterBar
             tags={allTags}
-            selectedTagIds={selectedTagIds}
-            onToggle={(tagId) =>
+            selectedSlugs={selectedTagIds}
+            onToggle={(slug) =>
               setSelectedTagIds((prev) =>
-                prev.includes(tagId)
-                  ? prev.filter((id) => id !== tagId)
-                  : [...prev, tagId],
+                prev.includes(slug)
+                  ? prev.filter((s) => s !== slug)
+                  : [...prev, slug],
               )
             }
-            onClear={() => setSelectedTagIds([])}
+            onClear={() => setSelectedTagIds(null)}
           />
         </div>
       )}

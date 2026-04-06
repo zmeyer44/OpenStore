@@ -11,7 +11,7 @@ import {
   or,
 } from "drizzle-orm";
 import { createRouter, workspaceProcedure } from "../init";
-import { files, workspaces, folders, fileTags } from "@locker/database";
+import { files, workspaces, folders, fileTags, tags } from "@locker/database";
 import { createStorageForFile } from "../../../server/storage";
 import {
   renameFileSchema,
@@ -31,14 +31,14 @@ export const filesRouter = createRouter({
       z.object({
         folderId: z.string().uuid().nullable().default(null),
         search: z.string().optional(),
-        tagIds: z.array(z.string().uuid()).optional(),
+        tagSlugs: z.array(z.string()).optional(),
         ...paginationSchema.shape,
         ...sortSchema.shape,
       }),
     )
     .query(async ({ ctx, input }) => {
       const { db } = ctx;
-      const { folderId, search, tagIds, page, pageSize, field, direction } =
+      const { folderId, search, tagSlugs, page, pageSize, field, direction } =
         input;
 
       const conditions = [eq(files.workspaceId, ctx.workspaceId)];
@@ -110,17 +110,23 @@ export const filesRouter = createRouter({
       }
 
       // Tag filtering (AND semantics: file must have ALL selected tags)
-      if (tagIds && tagIds.length > 0) {
+      if (tagSlugs && tagSlugs.length > 0) {
         conditions.push(
           inArray(
             files.id,
             db
               .select({ fileId: fileTags.fileId })
               .from(fileTags)
-              .where(inArray(fileTags.tagId, tagIds))
+              .innerJoin(tags, eq(fileTags.tagId, tags.id))
+              .where(
+                and(
+                  inArray(tags.slug, tagSlugs),
+                  eq(tags.workspaceId, ctx.workspaceId),
+                ),
+              )
               .groupBy(fileTags.fileId)
               .having(
-                sql`count(distinct ${fileTags.tagId}) = ${tagIds.length}`,
+                sql`count(distinct ${fileTags.tagId}) = ${tagSlugs.length}`,
               ),
           ),
         );

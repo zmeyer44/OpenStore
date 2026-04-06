@@ -18,6 +18,7 @@ export const tags = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 100 }).notNull(),
+    slug: varchar("slug", { length: 100 }).notNull(),
     color: varchar("color", { length: 7 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -25,6 +26,7 @@ export const tags = pgTable(
   (table) => [
     index("tags_workspace_id_idx").on(table.workspaceId),
     uniqueIndex("tags_workspace_name_idx").on(table.workspaceId, table.name),
+    uniqueIndex("tags_workspace_slug_idx").on(table.workspaceId, table.slug),
   ],
 );
 

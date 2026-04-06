@@ -231,7 +231,7 @@ export function ManageTagsDialog({
               placeholder="New tag name..."
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="h-8 text-sm"
+              className="h-8 pb-1.5 text-sm"
             />
             <Button
               type="submit"
