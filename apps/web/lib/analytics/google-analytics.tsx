@@ -1,23 +1,6 @@
-import Script from "next/script";
+import { GoogleAnalytics as GA } from "@next/third-parties/google";
 
 export function GoogleAnalytics() {
   if (!process.env.NEXT_PUBLIC_GA_TRACKING_ID) return null;
-  return (
-    <>
-      <Script
-        src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_TRACKING_ID}`}
-        strategy="lazyOnload"
-      />
-      <Script id="google-analytics" strategy="lazyOnload">
-        {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', '${process.env.NEXT_PUBLIC_GA_TRACKING_ID}', {
-              page_path: window.location.pathname,
-            });
-        `}
-      </Script>
-    </>
-  );
+  return <GA gaId={process.env.NEXT_PUBLIC_GA_TRACKING_ID} />;
 }
