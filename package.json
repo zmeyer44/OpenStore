@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
+    "start": "turbo start",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "db:generate": "turbo db:generate --filter=@locker/database",

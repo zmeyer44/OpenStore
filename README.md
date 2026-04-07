@@ -97,6 +97,7 @@ Set `BLOB_STORAGE_PROVIDER` in `.env`:
 | Command            | Description                      |
 | ------------------ | -------------------------------- |
 | `pnpm dev`         | Start all packages in dev mode   |
+| `pnpm start`       | Start all packages in production |
 | `pnpm build`       | Production build                 |
 | `pnpm typecheck`   | Type-check all packages          |
 | `pnpm lint`        | Lint all packages                |
