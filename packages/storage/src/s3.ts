@@ -23,14 +23,17 @@ export interface S3StorageConfig {
 export class S3StorageAdapter implements StorageProvider {
   private client: S3Client;
   private bucket: string;
+  private region: string;
+  private endpoint?: string;
 
   readonly supportsPresignedUpload = true;
 
   constructor(config?: S3StorageConfig) {
-    const region = config?.region ?? process.env.AWS_REGION ?? "us-east-1";
+    this.region = config?.region ?? process.env.AWS_REGION ?? "us-east-1";
+    this.endpoint = config?.endpoint ?? process.env.AWS_ENDPOINT_URL;
     this.client = new S3Client({
-      region,
-      ...(config?.endpoint ? { endpoint: config.endpoint } : {}),
+      region: this.region,
+      ...(this.endpoint ? { endpoint: this.endpoint } : {}),
       credentials: {
         accessKeyId: config?.accessKeyId ?? process.env.AWS_ACCESS_KEY_ID!,
         secretAccessKey:
@@ -38,6 +41,7 @@ export class S3StorageAdapter implements StorageProvider {
       },
       requestChecksumCalculation: "WHEN_REQUIRED",
       responseChecksumValidation: "WHEN_REQUIRED",
+      forcePathStyle: !!this.endpoint, // Required for S3-compatible services with custom endpoints
     });
     this.bucket = config?.bucket ?? process.env.S3_BUCKET ?? "locker";
   }
@@ -73,8 +77,11 @@ export class S3StorageAdapter implements StorageProvider {
       }),
     );
 
+    const baseURL = this.endpoint ? `${this.endpoint}/${this.bucket}` :
+      `https://${this.bucket}.s3.${this.region}.amazonaws.com`;
+
     return {
-      url: `https://${this.bucket}.s3.${process.env.AWS_REGION ?? "us-east-1"}.amazonaws.com/${params.path}`,
+      url: `${baseURL}/${params.path}`,
       path: params.path,
     };
   }
