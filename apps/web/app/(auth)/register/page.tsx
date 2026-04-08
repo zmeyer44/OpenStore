@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/assets/logo";
@@ -12,6 +12,12 @@ import { toast } from "sonner";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawRedirect = searchParams.get("redirect");
+  const redirectTo =
+    rawRedirect?.startsWith("/") && !rawRedirect.startsWith("//")
+      ? rawRedirect
+      : null;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,7 +32,7 @@ export default function RegisterPage() {
       if (result.error) {
         toast.error(result.error.message ?? "Registration failed");
       } else {
-        router.push("/onboarding");
+        router.push(redirectTo ?? "/onboarding");
       }
     } catch {
       toast.error("Something went wrong");
@@ -91,7 +97,14 @@ export default function RegisterPage() {
 
         <p className="text-sm text-muted-foreground text-center mt-4">
           Already have an account?{" "}
-          <Link href="/login" className="text-primary hover:underline">
+          <Link
+            href={
+              redirectTo
+                ? `/login?redirect=${encodeURIComponent(redirectTo)}`
+                : "/login"
+            }
+            className="text-primary hover:underline"
+          >
             Sign in
           </Link>
         </p>

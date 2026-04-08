@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/assets/logo";
@@ -12,6 +12,12 @@ import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawRedirect = searchParams.get("redirect");
+  const redirectTo =
+    rawRedirect?.startsWith("/") && !rawRedirect.startsWith("//")
+      ? rawRedirect
+      : null;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,7 +31,7 @@ export default function LoginPage() {
       if (result.error) {
         toast.error(result.error.message ?? "Invalid credentials");
       } else {
-        router.push("/home");
+        router.push(redirectTo ?? "/home");
       }
     } catch {
       toast.error("Something went wrong");
@@ -77,7 +83,14 @@ export default function LoginPage() {
 
         <p className="text-sm text-muted-foreground text-center mt-4">
           Don&apos;t have an account?{" "}
-          <Link href="/register" className="text-primary hover:underline">
+          <Link
+            href={
+              redirectTo
+                ? `/register?redirect=${encodeURIComponent(redirectTo)}`
+                : "/register"
+            }
+            className="text-primary hover:underline"
+          >
             Sign up
           </Link>
         </p>

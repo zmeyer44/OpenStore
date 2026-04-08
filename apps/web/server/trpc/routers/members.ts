@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gt } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
   createRouter,
@@ -12,9 +12,11 @@ import {
   workspaceMembers,
   workspaceInvites,
   users,
+  notifications,
 } from "@locker/database";
 import { inviteMemberSchema, updateMemberRoleSchema } from "@locker/common";
 import crypto from "crypto";
+import { createNotification } from "../../notifications";
 
 export const membersRouter = createRouter({
   list: workspaceProcedure.query(async ({ ctx }) => {
@@ -33,6 +35,41 @@ export const membersRouter = createRouter({
       .where(eq(workspaceMembers.workspaceId, ctx.workspaceId));
 
     return members;
+  }),
+
+  /** List pending invites addressed to the current user's email */
+  myPendingInvites: protectedProcedure.query(async ({ ctx }) => {
+    const [user] = await ctx.db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, ctx.userId));
+
+    if (!user) return [];
+
+    const invites = await ctx.db
+      .select({
+        id: workspaceInvites.id,
+        token: workspaceInvites.token,
+        role: workspaceInvites.role,
+        expiresAt: workspaceInvites.expiresAt,
+        createdAt: workspaceInvites.createdAt,
+        workspaceName: workspaces.name,
+        workspaceSlug: workspaces.slug,
+        inviterName: users.name,
+        inviterEmail: users.email,
+      })
+      .from(workspaceInvites)
+      .innerJoin(workspaces, eq(workspaces.id, workspaceInvites.workspaceId))
+      .innerJoin(users, eq(users.id, workspaceInvites.invitedById))
+      .where(
+        and(
+          eq(workspaceInvites.email, user.email),
+          eq(workspaceInvites.status, "pending"),
+          gt(workspaceInvites.expiresAt, new Date()),
+        ),
+      );
+
+    return invites;
   }),
 
   invite: workspaceAdminProcedure
@@ -92,21 +129,24 @@ export const membersRouter = createRouter({
         })
         .returning();
 
+      // Shared lookups for email + notification
+      const [workspace] = await ctx.db
+        .select({ name: workspaces.name })
+        .from(workspaces)
+        .where(eq(workspaces.id, ctx.workspaceId));
+
+      const [inviter] = await ctx.db
+        .select({ name: users.name, email: users.email })
+        .from(users)
+        .where(eq(users.id, ctx.userId));
+
+      const wsName = workspace?.name ?? "a workspace";
+
       // Send invitation email
       try {
         const { sendEmail } = await import("@locker/email");
         const { WorkspaceInviteEmail } =
           await import("@locker/email/templates/workspace-invite");
-
-        const [workspace] = await ctx.db
-          .select({ name: workspaces.name })
-          .from(workspaces)
-          .where(eq(workspaces.id, ctx.workspaceId));
-
-        const [inviter] = await ctx.db
-          .select({ name: users.name, email: users.email })
-          .from(users)
-          .where(eq(users.id, ctx.userId));
 
         const baseUrl =
           process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -114,11 +154,11 @@ export const membersRouter = createRouter({
 
         await sendEmail({
           to: input.email,
-          subject: `Join ${workspace?.name ?? "workspace"} on Locker`,
+          subject: `Join ${wsName} on Locker`,
           react: WorkspaceInviteEmail({
             email: input.email,
             url: inviteUrl,
-            workspaceName: workspace?.name ?? "workspace",
+            workspaceName: wsName,
             inviterName: inviter?.name ?? undefined,
             inviterEmail: inviter?.email ?? undefined,
           }),
@@ -126,6 +166,35 @@ export const membersRouter = createRouter({
       } catch {
         // Email send failure is non-fatal - invite is still created
         console.error("Failed to send invitation email");
+      }
+
+      // Create in-app notification for the invited user (if they already have an account)
+      try {
+        const [invitedUser] = await ctx.db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, input.email))
+          .limit(1);
+
+        if (invitedUser) {
+          const inviterName = inviter?.name ?? "Someone";
+
+          await createNotification({
+            db: ctx.db,
+            userId: invitedUser.id,
+            type: "workspace_invite",
+            title: `${inviterName} invited you to ${wsName}`,
+            body: `You've been invited to join the "${wsName}" workspace as a ${input.role}.`,
+            actionUrl: `/invite/${token}`,
+            metadata: {
+              workspaceId: ctx.workspaceId,
+              inviteId: invite!.id,
+            },
+          });
+        }
+      } catch {
+        // Notification failure is non-fatal
+        console.error("Failed to create invite notification");
       }
 
       return invite;
@@ -226,32 +295,32 @@ export const membersRouter = createRouter({
           ),
         );
 
-      if (existing.length > 0) {
-        await ctx.db
-          .update(workspaceInvites)
-          .set({ status: "accepted" })
-          .where(eq(workspaceInvites.id, invite.id));
-
-        const [ws] = await ctx.db
-          .select({ slug: workspaces.slug })
-          .from(workspaces)
-          .where(eq(workspaces.id, invite.workspaceId));
-
-        return { workspaceSlug: ws?.slug };
+      if (existing.length === 0) {
+        // Add as member
+        await ctx.db.insert(workspaceMembers).values({
+          workspaceId: invite.workspaceId,
+          userId: ctx.userId,
+          role: invite.role,
+        });
       }
-
-      // Add as member
-      await ctx.db.insert(workspaceMembers).values({
-        workspaceId: invite.workspaceId,
-        userId: ctx.userId,
-        role: invite.role,
-      });
 
       // Mark invite as accepted
       await ctx.db
         .update(workspaceInvites)
         .set({ status: "accepted" })
         .where(eq(workspaceInvites.id, invite.id));
+
+      // Mark the related notification as read so it doesn't show a stale link
+      await ctx.db
+        .update(notifications)
+        .set({ read: true })
+        .where(
+          and(
+            eq(notifications.userId, ctx.userId),
+            eq(notifications.type, "workspace_invite"),
+            eq(notifications.actionUrl, `/invite/${input.token}`),
+          ),
+        );
 
       const [ws] = await ctx.db
         .select({ slug: workspaces.slug })

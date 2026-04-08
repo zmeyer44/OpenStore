@@ -9,8 +9,10 @@ import {
   Sun,
   Moon,
   Ellipsis,
+  Bell,
 } from "lucide-react";
 import { signOut } from "@/lib/auth/client";
+import { trpc } from "@/lib/trpc/client";
 import { Avatar } from "@/components/avatar";
 import { cn } from "@/lib/utils";
 import {
@@ -95,6 +97,47 @@ function MenuRow({
   );
 }
 
+function NotificationBell({ collapsed }: { collapsed: boolean }) {
+  const router = useRouter();
+  const { data: unreadCount } = trpc.notifications.unreadCount.useQuery(
+    undefined,
+    { refetchInterval: 30_000 },
+  );
+
+  const hasUnread = (unreadCount ?? 0) > 0;
+
+  const button = (
+    <button
+      onClick={() => router.push("/settings/notifications")}
+      className={cn(
+        "relative flex items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+        collapsed ? "size-8" : "size-8 shrink-0",
+      )}
+      aria-label="Notifications"
+    >
+      <Bell className="size-4" />
+      {hasUnread && (
+        <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+          {unreadCount! > 9 ? "9+" : unreadCount}
+        </span>
+      )}
+    </button>
+  );
+
+  if (collapsed) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>
+          Notifications{hasUnread ? ` (${unreadCount})` : ""}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return button;
+}
+
 export function UserMenu({ user, collapsed }: UserMenuProps) {
   const router = useRouter();
   const displayName = user.name || user.email.split("@")[0];
@@ -107,8 +150,8 @@ export function UserMenu({ user, collapsed }: UserMenuProps) {
   const trigger = (
     <PopoverTrigger
       className={cn(
-        "flex items-center gap-2 rounded-lg transition-colors hover:bg-accent outline-none",
-        collapsed ? "size-8 justify-center" : "w-full p-1.5",
+        "flex min-w-0 flex-1 items-center gap-2 rounded-lg transition-colors hover:bg-accent outline-none",
+        collapsed ? "size-8 justify-center" : "p-1.5",
       )}
     >
       <Avatar
@@ -129,66 +172,84 @@ export function UserMenu({ user, collapsed }: UserMenuProps) {
   );
 
   return (
-    <Popover>
-      {collapsed ? (
-        <Tooltip>
-          <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-          <TooltipContent side="right" sideOffset={8}>
-            {displayName}
-          </TooltipContent>
-        </Tooltip>
-      ) : (
-        trigger
+    <div
+      className={cn(
+        "flex items-center gap-1",
+        collapsed ? "flex-col" : "flex-row",
       )}
+    >
+      <Popover>
+        {collapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>
+              {displayName}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          trigger
+        )}
 
-      <PopoverContent
-        side={collapsed ? "right" : "top"}
-        align="start"
-        sideOffset={8}
-        className="w-64 p-0"
-      >
-        {/* User header */}
-        <div className="flex items-center gap-3 p-3">
-          <Avatar
-            name={displayName}
-            src={user.image}
-            width={32}
-            className="size-8 shrink-0 rounded-full"
-          />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{displayName}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {user.email}
-            </p>
+        <PopoverContent
+          side={collapsed ? "right" : "top"}
+          align="start"
+          sideOffset={8}
+          className="w-64 p-0"
+        >
+          {/* User header */}
+          <div className="flex items-center gap-3 p-3">
+            <Avatar
+              name={displayName}
+              src={user.image}
+              width={32}
+              className="size-8 shrink-0 rounded-full"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{displayName}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {user.email}
+              </p>
+            </div>
+            <button
+              onClick={() => router.push("/settings/account")}
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label="Account settings"
+            >
+              <Settings className="size-4" />
+            </button>
           </div>
-          <button
-            onClick={() => router.push("/settings/account")}
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            aria-label="Account settings"
-          >
-            <Settings className="size-4" />
-          </button>
-        </div>
 
-        <Separator />
+          <Separator />
 
-        {/* Menu items */}
-        <div className="p-1.5">
-          <MenuRow
-            icon={Sun}
-            label="Theme"
-            onClick={() => {}}
-            right={<ThemeToggle />}
-          />
-        </div>
+          {/* Menu items */}
+          <div className="p-1.5">
+            <MenuRow
+              icon={Sun}
+              label="Theme"
+              onClick={() => {}}
+              right={<ThemeToggle />}
+            />
+          </div>
 
-        <Separator />
+          <Separator />
 
-        <div className="p-1.5">
-          <MenuRow icon={Settings} label="Account Settings" href="/settings/account" />
-          <MenuRow icon={LogOut} label="Log Out" onClick={handleSignOut} />
-        </div>
-      </PopoverContent>
-    </Popover>
+          <div className="p-1.5">
+            <MenuRow
+              icon={Settings}
+              label="Account Settings"
+              href="/settings/account"
+            />
+            <MenuRow
+              icon={Bell}
+              label="Notifications"
+              href="/settings/notifications"
+            />
+            <MenuRow icon={LogOut} label="Log Out" onClick={handleSignOut} />
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <NotificationBell collapsed={collapsed} />
+    </div>
   );
 }

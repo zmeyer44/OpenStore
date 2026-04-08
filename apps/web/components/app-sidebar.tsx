@@ -23,7 +23,7 @@ import {
   Bot,
   User,
   Boxes,
-  ArrowLeft,
+  Bell,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/assets/logo";
@@ -454,6 +454,12 @@ function AccountNav({
       label: "Account",
       icon: User,
       key: "account",
+    },
+    {
+      href: "/settings/notifications",
+      label: "Notifications",
+      icon: Bell,
+      key: "notifications",
     },
   ];
 

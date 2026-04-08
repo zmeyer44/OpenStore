@@ -8,7 +8,7 @@ interface SendEmailOptions {
   from?: string;
 }
 
-const DEFAULT_FROM = "Locker <noreply@locker.dev>";
+const DEFAULT_FROM = "Locker <noreply@mail.locker.dev>";
 
 export async function sendEmail({
   to,
