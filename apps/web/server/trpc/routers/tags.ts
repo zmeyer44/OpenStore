@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { eq, and, asc, inArray } from "drizzle-orm";
 import { createRouter, workspaceProcedure } from "../init";
-import { tags, fileTags, files } from "@locker/database";
+import { tags, fileTags, files, knowledgeBases } from "@locker/database";
 import {
   createTagSchema,
   updateTagSchema,
@@ -10,6 +10,7 @@ import {
   generateTagSlug,
 } from "@locker/common";
 import { TRPCError } from "@trpc/server";
+import { autoIngestFile } from "../../knowledge-base/auto-ingest";
 
 export const tagsRouter = createRouter({
   list: workspaceProcedure.query(async ({ ctx }) => {
@@ -157,6 +158,29 @@ export const tagsRouter = createRouter({
         .from(fileTags)
         .innerJoin(tags, eq(fileTags.tagId, tags.id))
         .where(eq(fileTags.fileId, fileId));
+
+      // Auto-ingest: if any new tags belong to a KB, ingest the file
+      if (tagIds.length > 0) {
+        const kbsForTags = await ctx.db
+          .select({ id: knowledgeBases.id })
+          .from(knowledgeBases)
+          .where(
+            and(
+              inArray(knowledgeBases.tagId, tagIds),
+              eq(knowledgeBases.workspaceId, ctx.workspaceId),
+              eq(knowledgeBases.status, "active"),
+            ),
+          );
+
+        if (kbsForTags.length > 0) {
+          void autoIngestFile({
+            db: ctx.db,
+            workspaceId: ctx.workspaceId,
+            userId: ctx.userId,
+            fileId,
+          });
+        }
+      }
 
       return newTags;
     }),

@@ -15,6 +15,7 @@ import { vfsShellRouter } from "./routers/vfs-shell";
 import { storageConfigRouter } from "./routers/storage-config";
 import { tagsRouter } from "./routers/tags";
 import { knowledgeBasesRouter } from "./routers/knowledge-bases";
+import { usersRouter } from "./routers/users";
 
 export const appRouter = createRouter({
   files: filesRouter,
@@ -33,6 +34,7 @@ export const appRouter = createRouter({
   vfsShell: vfsShellRouter,
   tags: tagsRouter,
   knowledgeBases: knowledgeBasesRouter,
+  users: usersRouter,
 });
 
 export type AppRouter = typeof appRouter;

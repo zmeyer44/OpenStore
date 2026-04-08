@@ -34,11 +34,14 @@ export function WorkspaceInviteEmail({
       <Body style={main}>
         <Container style={container}>
           <Section style={logoSection}>
-            <Text style={logoText}>Locker</Text>
+            {/* <Text style={logoText}>Locker</Text> */}
+            <Img
+              src={`https://locker.dev/assets/logo.png`}
+              height="32"
+              alt={"Locker logo"}
+            />
           </Section>
-
           <Text style={heading}>Join {workspaceName}</Text>
-
           {inviterName && inviterEmail ? (
             <Text style={paragraph}>
               <strong>{inviterName}</strong> ({inviterEmail}) has invited you to

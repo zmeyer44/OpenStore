@@ -34,11 +34,10 @@ export function ChatPanel({
     knowledgeBaseId,
   });
 
-  const { data: conversationData } =
-    trpc.knowledgeBases.conversation.useQuery(
-      { conversationId: conversationId! },
-      { enabled: !!conversationId },
-    );
+  const { data: conversationData } = trpc.knowledgeBases.conversation.useQuery(
+    { conversationId: conversationId! },
+    { enabled: !!conversationId },
+  );
 
   const createConversationMutation =
     trpc.knowledgeBases.createConversation.useMutation({
@@ -71,13 +70,22 @@ export function ChatPanel({
     }));
   }, [conversationData?.messages]);
 
+  // Keep a stable transport so useChat doesn't reset when
+  // conversationId transitions from null → UUID mid-session.
+  // Mutate the same object in place so the transport sees current values.
+  const transportBody = useRef({ knowledgeBaseId, conversationId });
+  transportBody.current.knowledgeBaseId = knowledgeBaseId;
+  transportBody.current.conversationId = conversationId;
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/kb/chat",
-        body: { knowledgeBaseId, conversationId },
+        body: transportBody.current,
       }),
-    [knowledgeBaseId, conversationId],
+    // Only recreate when the KB itself changes, not on conversationId updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [knowledgeBaseId],
   );
 
   const { messages, sendMessage, status, setMessages } = useChat({
@@ -193,26 +201,23 @@ export function ChatPanel({
               {messages.map((message: UIMessage) => (
                 <div
                   key={message.id}
-                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                  className={cn(
+                    "flex",
+                    message.role === "user" ? "justify-end" : "justify-start",
+                  )}
                 >
                   <div
-                    className={`rounded-lg px-4 py-2 max-w-[80%] ${
-                      message.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    }`}
+                    className={cn(
+                      "rounded-lg px-4 py-2 max-w-[80%]",
+                      message.role === "user" ? "bg-primary/8" : "bg-muted",
+                    )}
                   >
                     {message.parts.map((part, partIdx: number) => {
                       if (part.type === "text") {
                         return (
                           <div
                             key={partIdx}
-                            className={cn(
-                              "prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-code:text-[0.85em]",
-                              message.role === "user"
-                                ? "prose-invert"
-                                : "dark:prose-invert",
-                            )}
+                            className="prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-code:text-[0.85em] dark:prose-invert"
                           >
                             <WikiLinkedMarkdown
                               content={part.text}
@@ -228,7 +233,9 @@ export function ChatPanel({
                             className="text-xs text-muted-foreground border rounded p-2 my-1"
                           >
                             <span className="font-mono">
-                              Tool: {("toolName" in part && part.toolName) || "unknown"}
+                              Tool:{" "}
+                              {("toolName" in part && part.toolName) ||
+                                "unknown"}
                             </span>
                             {"state" in part &&
                               part.state === "output-available" &&
@@ -245,13 +252,14 @@ export function ChatPanel({
                   </div>
                 </div>
               ))}
-              {isStreaming && messages[messages.length - 1]?.role !== "assistant" && (
-                <div className="flex justify-start">
-                  <div className="bg-muted rounded-lg px-4 py-2">
-                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
+              {isStreaming &&
+                messages[messages.length - 1]?.role !== "assistant" && (
+                  <div className="flex justify-start">
+                    <div className="bg-muted rounded-lg px-4 py-2">
+                      <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
               <div ref={messagesEndRef} />
             </div>
           </ScrollArea>
@@ -264,7 +272,7 @@ export function ChatPanel({
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="Ask a question..."
                 rows={1}
-                className="resize-none min-h-[40px]"
+                className="resize-none min-h-10"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();

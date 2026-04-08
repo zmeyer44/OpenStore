@@ -1,7 +1,8 @@
 "use client";
 
-import { FileText, Upload, Loader2 } from "lucide-react";
+import { FileText, Upload, Loader2, Check } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -19,6 +20,7 @@ export function SourceList({
   const ingestMutation = trpc.knowledgeBases.ingest.useMutation({
     onSuccess: (result) => {
       utils.knowledgeBases.wikiPages.invalidate({ knowledgeBaseId });
+      utils.knowledgeBases.sources.invalidate({ knowledgeBaseId });
       utils.knowledgeBases.get.invalidate({ id: knowledgeBaseId });
       toast.success(result.message);
     },
@@ -29,6 +31,20 @@ export function SourceList({
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function formatRelativeTime(date: Date | string): string {
+    const now = Date.now();
+    const then = new Date(date).getTime();
+    const seconds = Math.floor((now - then) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    return new Date(date).toLocaleDateString();
   }
 
   return (
@@ -60,6 +76,23 @@ export function SourceList({
                   {file.mimeType} &middot; {formatSize(file.size)}
                 </p>
               </div>
+              <span
+                className={cn(
+                  "text-xs shrink-0",
+                  file.ingestedAt
+                    ? "text-muted-foreground"
+                    : "text-amber-500",
+                )}
+              >
+                {file.ingestedAt ? (
+                  <span className="flex items-center gap-1">
+                    <Check className="size-3" />
+                    Ingested {formatRelativeTime(file.ingestedAt)}
+                  </span>
+                ) : (
+                  "Not ingested"
+                )}
+              </span>
               <Button
                 size="sm"
                 variant="outline"

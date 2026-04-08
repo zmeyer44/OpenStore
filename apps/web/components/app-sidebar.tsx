@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   FolderOpen,
   Share2,
   Upload,
-  LogOut,
   Settings,
   Users,
   Key,
@@ -22,12 +21,15 @@ import {
   Brain,
   MessageSquare,
   Bot,
+  User,
+  Boxes,
+  ArrowLeft,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/assets/logo";
-import { signOut } from "@/lib/auth/client";
 import { trpc } from "@/lib/trpc/client";
 import { StorageUsage } from "./storage-usage";
+import { UserMenu } from "./user-menu";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -58,6 +60,8 @@ const SIDEBAR_ICON_MAP: Record<string, LucideIcon> = {
   settings: Settings,
   folder: FolderOpen,
 };
+
+type SidebarArea = "workspace" | "account";
 
 function NavItem({
   href,
@@ -142,14 +146,25 @@ export function AppSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+
   const slugMatch = pathname.match(/\/w\/([^/]+)/);
   const slug = slugMatch?.[1] ?? "";
   const prefix = `/w/${slug}`;
 
+  const area: SidebarArea = useMemo(() => {
+    if (pathname.startsWith("/settings")) return "account";
+    return "workspace";
+  }, [pathname]);
+
+  const isWorkspace = area === "workspace";
+
   const { data: workspacesList } = trpc.workspaces.list.useQuery();
   const currentWorkspace = workspacesList?.find((w) => w.slug === slug) ?? null;
 
-  const { data: installedPlugins } = trpc.plugins.installed.useQuery();
+  const { data: installedPlugins } = trpc.plugins.installed.useQuery(
+    undefined,
+    { enabled: isWorkspace },
+  );
 
   const pluginNavItems = (installedPlugins ?? [])
     .filter((p) => p.status === "active" && p.manifest.sidebarItem)
@@ -163,6 +178,149 @@ export function AppSidebar({
       };
     });
 
+  const toggleButton = (
+    <button
+      onClick={() => setCollapsed(!collapsed)}
+      className="relative inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+    >
+      <div className="relative grid size-5 place-items-center">
+        <PanelLeftClose
+          className={cn(
+            "absolute size-4 transition-all",
+            collapsed ? "scale-0" : "scale-100",
+          )}
+        />
+        <PanelLeftOpen
+          className={cn(
+            "absolute size-4 transition-all",
+            collapsed ? "scale-100" : "scale-0",
+          )}
+        />
+      </div>
+    </button>
+  );
+
+  return (
+    <div
+      className={cn(
+        "flex h-full shrink-0 flex-col justify-between overflow-hidden p-2 transition-all duration-300 ease-in-out",
+        collapsed ? "w-[52px]" : "w-[240px]",
+      )}
+    >
+      {/* Top section */}
+      <div className="flex flex-1 flex-col gap-2 overflow-hidden">
+        {/* Header */}
+        <div
+          className={cn(
+            "flex h-12 items-center gap-2 transition-all",
+            collapsed ? "justify-center" : "px-1",
+          )}
+        >
+          {!collapsed && (
+            <div className="flex flex-1 items-center gap-2 min-w-0">
+              {isWorkspace && currentWorkspace ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="flex items-center gap-2 min-w-0 rounded-lg p-1 -ml-1 hover:bg-accent transition-colors outline-none">
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-semibold">
+                      {currentWorkspace.name[0]?.toUpperCase() ?? "W"}
+                    </div>
+                    <span className="truncate text-sm font-semibold">
+                      {currentWorkspace.name}
+                    </span>
+                    <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    sideOffset={4}
+                    className="w-56"
+                  >
+                    {workspacesList?.map((ws) => (
+                      <DropdownMenuItem
+                        key={ws.id}
+                        onSelect={() => router.push(`/w/${ws.slug}`)}
+                        className={
+                          ws.id === currentWorkspace.id ? "bg-accent" : ""
+                        }
+                      >
+                        <div className="flex size-6 items-center justify-center rounded bg-primary text-primary-foreground font-semibold text-xs shrink-0">
+                          {ws.name[0]?.toUpperCase() ?? "W"}
+                        </div>
+                        <span className="truncate">{ws.name}</span>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={() => router.push("/onboarding")}
+                    >
+                      <Plus className="size-4" />
+                      Create workspace
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Link href="/" className="flex items-center gap-2">
+                  <Logo className="size-6 shrink-0 text-foreground" />
+                  <span className="text-sm font-semibold">Locker</span>
+                </Link>
+              )}
+            </div>
+          )}
+          {toggleButton}
+        </div>
+
+        {/* Nav sections — context-dependent */}
+        <div className="flex flex-col gap-3">
+          {isWorkspace ? (
+            <WorkspaceNav
+              pathname={pathname}
+              prefix={prefix}
+              collapsed={collapsed}
+              pluginNavItems={pluginNavItems}
+            />
+          ) : (
+            <AccountNav
+              pathname={pathname}
+              collapsed={collapsed}
+              workspacesList={workspacesList ?? []}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Bottom section */}
+      <div className="flex flex-col gap-1">
+        {/* Storage usage card — only in workspace context */}
+        {isWorkspace && !collapsed && (
+          <div className="rounded-lg ring-1 ring-border shadow-sm p-2.5 mb-1">
+            <StorageUsage />
+          </div>
+        )}
+
+        {/* User menu */}
+        <UserMenu user={user} collapsed={collapsed} />
+      </div>
+    </div>
+  );
+}
+
+// ── Workspace nav (files, plugins, workspace settings) ───────────────────
+
+function WorkspaceNav({
+  pathname,
+  prefix,
+  collapsed,
+  pluginNavItems,
+}: {
+  pathname: string;
+  prefix: string;
+  collapsed: boolean;
+  pluginNavItems: {
+    href: string;
+    label: string;
+    icon: LucideIcon;
+    key: string;
+  }[];
+}) {
   const navItems = [
     { href: prefix, label: "My Files", icon: FolderOpen, key: "files" },
     {
@@ -222,193 +380,118 @@ export function AppSidebar({
     },
   ];
 
-  const toggleButton = (
-    <button
-      onClick={() => setCollapsed(!collapsed)}
-      className="relative inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-    >
-      <div className="relative grid size-5 place-items-center">
-        <PanelLeftClose
-          className={cn(
-            "absolute size-4 transition-all",
-            collapsed ? "scale-0" : "scale-100",
-          )}
-        />
-        <PanelLeftOpen
-          className={cn(
-            "absolute size-4 transition-all",
-            collapsed ? "scale-100" : "scale-0",
-          )}
-        />
-      </div>
-    </button>
+  return (
+    <>
+      <NavSection label="Files" collapsed={collapsed}>
+        {navItems.map((item) => {
+          const isActive =
+            item.key === "files"
+              ? pathname === prefix ||
+                pathname.startsWith(`${prefix}/folder`)
+              : pathname.startsWith(item.href);
+          return (
+            <NavItem
+              key={item.key}
+              href={item.href}
+              icon={item.icon}
+              label={item.label}
+              isActive={isActive}
+              collapsed={collapsed}
+            />
+          );
+        })}
+      </NavSection>
+
+      <NavSection label="Plugins" collapsed={collapsed}>
+        {pluginSectionItems.map((item) => {
+          const isActive = pathname.startsWith(item.href);
+          return (
+            <NavItem
+              key={item.key}
+              href={item.href}
+              icon={item.icon}
+              label={item.label}
+              isActive={isActive}
+              collapsed={collapsed}
+            />
+          );
+        })}
+      </NavSection>
+
+      <NavSection label="Workspace" collapsed={collapsed}>
+        {settingsItems.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <NavItem
+              key={item.key}
+              href={item.href}
+              icon={item.icon}
+              label={item.label}
+              isActive={isActive}
+              collapsed={collapsed}
+            />
+          );
+        })}
+      </NavSection>
+    </>
   );
+}
+
+// ── Account nav (settings + workspace picker) ────────────────────────────
+
+function AccountNav({
+  pathname,
+  collapsed,
+  workspacesList,
+}: {
+  pathname: string;
+  collapsed: boolean;
+  workspacesList: { id: string; name: string; slug: string; role: string }[];
+}) {
+  const accountItems = [
+    {
+      href: "/settings/account",
+      label: "Account",
+      icon: User,
+      key: "account",
+    },
+  ];
 
   return (
-    <div
-      className={cn(
-        "flex h-full shrink-0 flex-col justify-between overflow-hidden p-2 transition-all duration-300 ease-in-out",
-        collapsed ? "w-[52px]" : "w-[240px]",
-      )}
-    >
-      {/* Top section */}
-      <div className="flex flex-1 flex-col gap-2 overflow-hidden">
-        {/* Header */}
-        <div
-          className={cn(
-            "flex h-12 items-center gap-2 transition-all",
-            collapsed ? "justify-center" : "px-1",
-          )}
-        >
-          {!collapsed && (
-            <div className="flex flex-1 items-center gap-2 min-w-0">
-              {currentWorkspace ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="flex items-center gap-2 min-w-0 rounded-lg p-1 -ml-1 hover:bg-accent transition-colors outline-none">
-                    <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-semibold">
-                      {currentWorkspace.name[0]?.toUpperCase() ?? "W"}
-                    </div>
-                    <span className="truncate text-sm font-semibold">
-                      {currentWorkspace.name}
-                    </span>
-                    <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    sideOffset={4}
-                    className="w-56"
-                  >
-                    {workspacesList?.map((ws) => (
-                      <DropdownMenuItem
-                        key={ws.id}
-                        onSelect={() => router.push(`/w/${ws.slug}`)}
-                        className={
-                          ws.id === currentWorkspace.id ? "bg-accent" : ""
-                        }
-                      >
-                        <div className="flex size-6 items-center justify-center rounded bg-primary text-primary-foreground font-semibold text-xs shrink-0">
-                          {ws.name[0]?.toUpperCase() ?? "W"}
-                        </div>
-                        <span className="truncate">{ws.name}</span>
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onSelect={() => router.push("/onboarding")}
-                    >
-                      <Plus className="size-4" />
-                      Create workspace
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
-                <Link href="/" className="flex items-center gap-2">
-                  <Logo className="size-6 shrink-0 text-foreground" />
-                  <span className="text-sm font-semibold">Locker</span>
-                </Link>
-              )}
-            </div>
-          )}
-          {toggleButton}
-        </div>
+    <>
+      <NavSection label="Settings" collapsed={collapsed}>
+        {accountItems.map((item) => (
+          <NavItem
+            key={item.key}
+            href={item.href}
+            icon={item.icon}
+            label={item.label}
+            isActive={pathname === item.href}
+            collapsed={collapsed}
+          />
+        ))}
+      </NavSection>
 
-        {/* Nav sections */}
-        <div className="flex flex-col gap-3">
-          <NavSection label="Files" collapsed={collapsed}>
-            {navItems.map((item) => {
-              const isActive =
-                item.key === "files"
-                  ? pathname === prefix ||
-                    pathname.startsWith(`${prefix}/folder`)
-                  : pathname.startsWith(item.href);
-              return (
-                <NavItem
-                  key={item.key}
-                  href={item.href}
-                  icon={item.icon}
-                  label={item.label}
-                  isActive={isActive}
-                  collapsed={collapsed}
-                />
-              );
-            })}
-          </NavSection>
-
-          <NavSection label="Plugins" collapsed={collapsed}>
-            {pluginSectionItems.map((item) => {
-              const isActive = pathname.startsWith(item.href);
-              return (
-                <NavItem
-                  key={item.key}
-                  href={item.href}
-                  icon={item.icon}
-                  label={item.label}
-                  isActive={isActive}
-                  collapsed={collapsed}
-                />
-              );
-            })}
-          </NavSection>
-
-          <NavSection label="Workspace" collapsed={collapsed}>
-            {settingsItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <NavItem
-                  key={item.key}
-                  href={item.href}
-                  icon={item.icon}
-                  label={item.label}
-                  isActive={isActive}
-                  collapsed={collapsed}
-                />
-              );
-            })}
-          </NavSection>
-        </div>
-      </div>
-
-      {/* Bottom section */}
-      <div className="flex flex-col gap-1">
-        {/* Storage usage card */}
-        {!collapsed && (
-          <div className="rounded-lg ring-1 ring-border shadow-sm p-2.5 mb-1">
-            <StorageUsage />
-          </div>
-        )}
-
-        {/* Sign out */}
-        {collapsed ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={async () => {
-                  await signOut();
-                  router.push("/login");
-                }}
-                className="flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-              >
-                <LogOut className="size-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right" sideOffset={8}>
-              Sign out
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          <button
-            onClick={async () => {
-              await signOut();
-              router.push("/login");
-            }}
-            className="flex h-8 w-full items-center gap-2 rounded-lg p-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-          >
-            <LogOut className="size-4 shrink-0" />
-            <span className="truncate">Sign out</span>
-          </button>
-        )}
-      </div>
-
-    </div>
+      <NavSection label="Workspaces" collapsed={collapsed}>
+        {workspacesList.map((ws) => (
+          <NavItem
+            key={ws.id}
+            href={`/w/${ws.slug}`}
+            icon={Boxes}
+            label={ws.name}
+            isActive={false}
+            collapsed={collapsed}
+          />
+        ))}
+        <NavItem
+          key="new-workspace"
+          href="/onboarding"
+          icon={Plus}
+          label="New workspace"
+          isActive={false}
+          collapsed={collapsed}
+        />
+      </NavSection>
+    </>
   );
 }

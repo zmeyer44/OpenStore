@@ -1,6 +1,7 @@
 "use client";
 
 import { X, AlertTriangle, Info, AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -77,9 +78,9 @@ export function LintResults({
             return issues.map((issue, i) => (
               <div
                 key={`${severity}-${i}`}
-                className={`flex items-start gap-2 rounded px-3 py-2 ${config.bg}`}
+                className={cn("flex items-start gap-2 rounded px-3 py-2", config.bg)}
               >
-                <Icon className={`size-3.5 mt-0.5 shrink-0 ${config.color}`} />
+                <Icon className={cn("size-3.5 mt-0.5 shrink-0", config.color)} />
                 <div className="min-w-0 flex-1">
                   <button
                     onClick={() => onNavigateToPage(issue.page)}

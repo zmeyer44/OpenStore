@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -65,16 +65,31 @@ export function KBDetailPage({ id }: { id: string }) {
     [updateUrl],
   );
 
-  const { data: kb, isLoading } = trpc.knowledgeBases.get.useQuery({ id });
+  const { data: kb, isLoading } = trpc.knowledgeBases.get.useQuery(
+    { id },
+    { refetchInterval: (query) => query.state.data?.status === "building" ? 3000 : false },
+  );
   const [lintResults, setLintResults] = useState<LintResult | null>(null);
+
+  // Detect when KB finishes building so we can refresh wiki pages + notify
+  const prevStatus = useRef(kb?.status);
+  useEffect(() => {
+    if (prevStatus.current === "building" && kb?.status === "active") {
+      utils.knowledgeBases.wikiPages.invalidate({ knowledgeBaseId: id });
+      toast.success("Knowledge base build complete");
+    }
+    if (prevStatus.current === "building" && kb?.status === "error") {
+      toast.error("Knowledge base build failed");
+    }
+    prevStatus.current = kb?.status;
+  }, [kb?.status, id, utils]);
+
+  const isBuilding = kb?.status === "building";
 
   const ingestAllMutation = trpc.knowledgeBases.ingestAll.useMutation({
     onSuccess: (result) => {
       utils.knowledgeBases.get.invalidate({ id });
-      utils.knowledgeBases.wikiPages.invalidate({ knowledgeBaseId: id });
-      toast.success(
-        `Ingested ${result.filesProcessed} files: ${result.pagesCreated} pages created, ${result.pagesUpdated} updated${result.errors ? `, ${result.errors} errors` : ""}`,
-      );
+      toast.info(`Building knowledge base from ${result.totalFiles} files...`);
     },
     onError: (error) => toast.error(error.message),
   });
@@ -139,14 +154,14 @@ export function KBDetailPage({ id }: { id: string }) {
           onClick={() =>
             ingestAllMutation.mutate({ knowledgeBaseId: id })
           }
-          disabled={ingestAllMutation.isPending}
+          disabled={ingestAllMutation.isPending || isBuilding}
         >
-          {ingestAllMutation.isPending ? (
+          {ingestAllMutation.isPending || isBuilding ? (
             <Loader2 className="animate-spin" />
           ) : (
             <RefreshCw className="size-3.5" />
           )}
-          Ingest All
+          {isBuilding ? "Building..." : "Ingest All"}
         </Button>
 
         <Button

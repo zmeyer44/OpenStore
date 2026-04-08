@@ -5,6 +5,7 @@ import {
   knowledgeBases,
   kbConversations,
   kbMessages,
+  kbFileIngestions,
   tags,
   fileTags,
   files,
@@ -20,6 +21,7 @@ import { TRPCError } from "@trpc/server";
 import type { Database } from "@locker/database";
 import { createStorageForWorkspace, createStorageForFile } from "../../storage";
 import { getHandler, buildPluginContext } from "../../plugins/runtime";
+import { ingestFileIntoKB } from "../../knowledge-base/auto-ingest";
 
 async function getKBWithAccess(
   db: Database,
@@ -44,6 +46,16 @@ async function getKBWithAccess(
     });
   }
   return kb;
+}
+
+function validatePagePath(pagePath: string): void {
+  if (
+    pagePath.includes("..") ||
+    pagePath.startsWith("/") ||
+    !pagePath.endsWith(".md")
+  ) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid page path" });
+  }
 }
 
 async function streamToString(stream: ReadableStream): Promise<string> {
@@ -243,9 +255,17 @@ export const knowledgeBasesRouter = createRouter({
           mimeType: files.mimeType,
           size: files.size,
           updatedAt: files.updatedAt,
+          ingestedAt: kbFileIngestions.ingestedAt,
         })
         .from(fileTags)
         .innerJoin(files, eq(fileTags.fileId, files.id))
+        .leftJoin(
+          kbFileIngestions,
+          and(
+            eq(kbFileIngestions.fileId, files.id),
+            eq(kbFileIngestions.knowledgeBaseId, input.knowledgeBaseId),
+          ),
+        )
         .where(eq(fileTags.tagId, kb.tagId))
         .orderBy(asc(files.name));
     }),
@@ -286,6 +306,7 @@ export const knowledgeBasesRouter = createRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
+      validatePagePath(input.pagePath);
       const kb = await getKBWithAccess(
         ctx.db,
         input.knowledgeBaseId,
@@ -316,6 +337,7 @@ export const knowledgeBasesRouter = createRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      validatePagePath(input.pagePath);
       const kb = await getKBWithAccess(
         ctx.db,
         input.knowledgeBaseId,
@@ -340,96 +362,30 @@ export const knowledgeBasesRouter = createRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const kb = await getKBWithAccess(
-        ctx.db,
-        input.knowledgeBaseId,
-        ctx.workspaceId,
-      );
+      // Verify access
+      await getKBWithAccess(ctx.db, input.knowledgeBaseId, ctx.workspaceId);
 
-      // Get file info
-      const [file] = await ctx.db
-        .select({
-          id: files.id,
-          name: files.name,
-          mimeType: files.mimeType,
-          storagePath: files.storagePath,
-          storageConfigId: files.storageConfigId,
-        })
-        .from(files)
-        .where(
-          and(
-            eq(files.id, input.fileId),
-            eq(files.workspaceId, ctx.workspaceId),
-          ),
-        )
-        .limit(1);
-
-      if (!file) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "File not found" });
-      }
-
-      // Get file content
-      let fileContent: string;
-
-      if (isTextIndexable(file.mimeType)) {
-        const storage = await createStorageForFile(file.storageConfigId);
-        const { data } = await storage.download(file.storagePath);
-        fileContent = await streamToString(data);
-      } else {
-        // Try to use transcription
-        const [transcription] = await ctx.db
-          .select({ content: fileTranscriptions.content })
-          .from(fileTranscriptions)
-          .where(
-            and(
-              eq(fileTranscriptions.fileId, file.id),
-              eq(fileTranscriptions.status, "completed"),
-            ),
-          )
-          .limit(1);
-
-        if (!transcription || !transcription.content) {
-          throw new TRPCError({
-            code: "PRECONDITION_FAILED",
-            message:
-              "This file needs to be transcribed first. Install the Document Transcription plugin and transcribe the file.",
-          });
-        }
-        fileContent = transcription.content;
-      }
-
-      // Get the handler
-      const handler = getHandler("knowledge-base");
-      if (!handler?.ingest) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Knowledge base handler not available",
-        });
-      }
-
-      // Build plugin context
-      const pluginCtx = await buildPluginContext({
+      const result = await ingestFileIntoKB({
         db: ctx.db,
         workspaceId: ctx.workspaceId,
         userId: ctx.userId,
-        pluginId: kb.id,
-        config: {},
+        knowledgeBaseId: input.knowledgeBaseId,
+        fileId: input.fileId,
       });
 
-      const result = await handler.ingest(pluginCtx, {
-        knowledgeBaseId: kb.id,
-        fileId: file.id,
-        fileName: file.name,
-        fileContent,
-        wikiStoragePath: kb.wikiStoragePath,
-        schemaPrompt: kb.schemaPrompt,
-      });
-
-      // Update lastIngestedAt
-      await ctx.db
-        .update(knowledgeBases)
-        .set({ lastIngestedAt: new Date(), updatedAt: new Date() })
-        .where(eq(knowledgeBases.id, kb.id));
+      if (result.status === "error") {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: result.message,
+        });
+      }
+      if (result.status === "skipped") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "This file needs to be transcribed first. Install the Document Transcription plugin and transcribe the file.",
+        });
+      }
 
       return result;
     }),
@@ -442,6 +398,13 @@ export const knowledgeBasesRouter = createRouter({
         input.knowledgeBaseId,
         ctx.workspaceId,
       );
+
+      if (kb.status === "building") {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Knowledge base is already building",
+        });
+      }
 
       // Set status to building
       await ctx.db
@@ -463,7 +426,13 @@ export const knowledgeBasesRouter = createRouter({
         .where(eq(fileTags.tagId, kb.tagId));
 
       const handler = getHandler("knowledge-base");
-      if (!handler?.ingest) {
+      const ingestFn = handler?.ingest;
+      if (!ingestFn) {
+        // Reset status since we can't proceed
+        await ctx.db
+          .update(knowledgeBases)
+          .set({ status: "active", updatedAt: new Date() })
+          .where(eq(knowledgeBases.id, kb.id));
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Knowledge base handler not available",
@@ -478,69 +447,92 @@ export const knowledgeBasesRouter = createRouter({
         config: {},
       });
 
-      let totalCreated = 0;
-      let totalUpdated = 0;
-      let errors = 0;
-
-      for (const file of taggedFiles) {
+      // Fire-and-forget: process files in the background so the HTTP
+      // request returns immediately instead of blocking for minutes.
+      // The KB `status` field ("building" → "active"/"error") is the
+      // polling mechanism for the client.
+      void (async () => {
+        let errors = 0;
         try {
-          let fileContent: string;
+          for (const file of taggedFiles) {
+            try {
+              let fileContent: string;
 
-          if (isTextIndexable(file.mimeType)) {
-            const storage = await createStorageForFile(file.storageConfigId);
-            const { data } = await storage.download(file.storagePath);
-            fileContent = await streamToString(data);
-          } else {
-            const [transcription] = await ctx.db
-              .select({ content: fileTranscriptions.content })
-              .from(fileTranscriptions)
-              .where(
-                and(
-                  eq(fileTranscriptions.fileId, file.id),
-                  eq(fileTranscriptions.status, "completed"),
-                ),
-              )
-              .limit(1);
+              if (isTextIndexable(file.mimeType)) {
+                const storage = await createStorageForFile(
+                  file.storageConfigId,
+                );
+                const { data } = await storage.download(file.storagePath);
+                fileContent = await streamToString(data);
+              } else {
+                const [transcription] = await ctx.db
+                  .select({ content: fileTranscriptions.content })
+                  .from(fileTranscriptions)
+                  .where(
+                    and(
+                      eq(fileTranscriptions.fileId, file.id),
+                      eq(fileTranscriptions.status, "ready"),
+                    ),
+                  )
+                  .limit(1);
 
-            if (!transcription?.content) {
+                if (!transcription?.content) {
+                  errors++;
+                  continue;
+                }
+                fileContent = transcription.content;
+              }
+
+              await ingestFn(pluginCtx, {
+                knowledgeBaseId: kb.id,
+                fileId: file.id,
+                fileName: file.name,
+                fileContent,
+                wikiStoragePath: kb.wikiStoragePath,
+                schemaPrompt: kb.schemaPrompt,
+              });
+
+              // Record per-file ingestion
+              await ctx.db
+                .insert(kbFileIngestions)
+                .values({
+                  knowledgeBaseId: kb.id,
+                  fileId: file.id,
+                  status: "ingested",
+                  ingestedAt: new Date(),
+                })
+                .onConflictDoUpdate({
+                  target: [
+                    kbFileIngestions.knowledgeBaseId,
+                    kbFileIngestions.fileId,
+                  ],
+                  set: { status: "ingested", ingestedAt: new Date() },
+                });
+            } catch {
               errors++;
-              continue;
             }
-            fileContent = transcription.content;
           }
 
-          const result = await handler.ingest(pluginCtx, {
-            knowledgeBaseId: kb.id,
-            fileId: file.id,
-            fileName: file.name,
-            fileContent,
-            wikiStoragePath: kb.wikiStoragePath,
-            schemaPrompt: kb.schemaPrompt,
-          });
-
-          totalCreated += result.pagesCreated.length;
-          totalUpdated += result.pagesUpdated.length;
+          await ctx.db
+            .update(knowledgeBases)
+            .set({
+              status: "active",
+              lastIngestedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(knowledgeBases.id, kb.id));
         } catch {
-          errors++;
+          // If the whole loop blows up, mark as error so it doesn't stay
+          // stuck in "building" forever.
+          await ctx.db
+            .update(knowledgeBases)
+            .set({ status: "error", updatedAt: new Date() })
+            .where(eq(knowledgeBases.id, kb.id))
+            .catch(() => {});
         }
-      }
+      })();
 
-      // Update status back to active
-      await ctx.db
-        .update(knowledgeBases)
-        .set({
-          status: "active",
-          lastIngestedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(knowledgeBases.id, kb.id));
-
-      return {
-        filesProcessed: taggedFiles.length - errors,
-        errors,
-        pagesCreated: totalCreated,
-        pagesUpdated: totalUpdated,
-      };
+      return { status: "building", totalFiles: taggedFiles.length };
     }),
 
   lint: workspaceProcedure
@@ -675,22 +667,34 @@ export const knowledgeBasesRouter = createRouter({
   deleteConversation: workspaceProcedure
     .input(z.object({ conversationId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const [deleted] = await ctx.db
-        .delete(kbConversations)
+      // Verify conversation belongs to a KB in the current workspace
+      const [conv] = await ctx.db
+        .select({ id: kbConversations.id })
+        .from(kbConversations)
+        .innerJoin(
+          knowledgeBases,
+          eq(kbConversations.knowledgeBaseId, knowledgeBases.id),
+        )
         .where(
           and(
             eq(kbConversations.id, input.conversationId),
             eq(kbConversations.userId, ctx.userId),
+            eq(knowledgeBases.workspaceId, ctx.workspaceId),
           ),
         )
-        .returning();
+        .limit(1);
 
-      if (!deleted) {
+      if (!conv) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Conversation not found",
         });
       }
+
+      await ctx.db
+        .delete(kbConversations)
+        .where(eq(kbConversations.id, conv.id));
+
       return { success: true };
     }),
 });

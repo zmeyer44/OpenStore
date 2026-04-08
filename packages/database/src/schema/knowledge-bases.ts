@@ -13,6 +13,7 @@ import { relations } from "drizzle-orm";
 import { workspaces } from "./workspaces";
 import { users } from "./users";
 import { tags } from "./tags";
+import { files } from "./files";
 
 /** URL-safe 16-char random ID matching the AI SDK's default nanoid length. */
 function generateId(): string {
@@ -91,6 +92,29 @@ export const kbMessages = pgTable(
   ],
 );
 
+export const kbFileIngestions = pgTable(
+  "kb_file_ingestions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    knowledgeBaseId: uuid("knowledge_base_id")
+      .notNull()
+      .references(() => knowledgeBases.id, { onDelete: "cascade" }),
+    fileId: uuid("file_id")
+      .notNull()
+      .references(() => files.id, { onDelete: "cascade" }),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    ingestedAt: timestamp("ingested_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("kb_file_ingestions_kb_file_idx").on(
+      table.knowledgeBaseId,
+      table.fileId,
+    ),
+    index("kb_file_ingestions_file_idx").on(table.fileId),
+  ],
+);
+
 // ---------------------------------------------------------------------------
 // Relations
 // ---------------------------------------------------------------------------
@@ -135,3 +159,17 @@ export const kbMessagesRelations = relations(kbMessages, ({ one }) => ({
     references: [kbConversations.id],
   }),
 }));
+
+export const kbFileIngestionsRelations = relations(
+  kbFileIngestions,
+  ({ one }) => ({
+    knowledgeBase: one(knowledgeBases, {
+      fields: [kbFileIngestions.knowledgeBaseId],
+      references: [knowledgeBases.id],
+    }),
+    file: one(files, {
+      fields: [kbFileIngestions.fileId],
+      references: [files.id],
+    }),
+  }),
+);

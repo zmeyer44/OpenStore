@@ -161,6 +161,13 @@ export const knowledgeBaseHandler: PluginHandler = {
     const pagesUpdated: string[] = [];
 
     for (const action of actions) {
+      if (
+        action.path.includes("..") ||
+        action.path.startsWith("/") ||
+        !action.path.endsWith(".md")
+      ) {
+        continue;
+      }
       const pagePath = `${wikiStoragePath}${action.path}`;
       await writeWikiFile(storage, pagePath, action.content);
       if (action.type === "create") {

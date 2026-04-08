@@ -11,6 +11,7 @@ import { resolvePluginEndpoint } from "./resolve-endpoint";
 import { qmdClient } from "./handlers/qmd-client";
 import { ftsClient } from "./handlers/fts-client";
 import type { PluginHandler } from "./types";
+import { autoIngestFile } from "../knowledge-base/auto-ingest";
 
 export { isTextIndexable };
 
@@ -192,6 +193,9 @@ export async function transcribeFile(params: {
       fileName,
       content: result.content,
     });
+
+    // Auto-ingest into any knowledge bases that include this file
+    void autoIngestFile({ db, workspaceId, userId, fileId });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Unknown transcription error";
