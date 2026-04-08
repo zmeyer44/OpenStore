@@ -22,6 +22,7 @@ export function WorkspaceSwitcher({
   currentWorkspace: { id: string; name: string; slug: string };
 }) {
   const router = useRouter();
+  const utils = trpc.useUtils();
   const { data: workspaces } = trpc.workspaces.list.useQuery();
 
   return (
@@ -56,7 +57,14 @@ export function WorkspaceSwitcher({
             {workspaces?.map((ws) => (
               <DropdownMenuItem
                 key={ws.id}
-                onSelect={() => router.push(`/w/${ws.slug}`)}
+                onSelect={() => {
+                  if (ws.id !== currentWorkspace.id) {
+                    // Invalidate all cached queries so they refetch
+                    // with the new workspace's x-workspace-slug header
+                    void utils.invalidate();
+                  }
+                  router.push(`/w/${ws.slug}`);
+                }}
                 className={ws.id === currentWorkspace.id ? 'bg-accent' : ''}
               >
                 <div className="flex size-6 items-center justify-center rounded bg-primary text-primary-foreground font-semibold text-xs shrink-0">
