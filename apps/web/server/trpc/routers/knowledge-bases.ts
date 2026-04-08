@@ -307,6 +307,31 @@ export const knowledgeBasesRouter = createRouter({
       }
     }),
 
+  updateWikiPage: workspaceProcedure
+    .input(
+      z.object({
+        knowledgeBaseId: z.string().uuid(),
+        pagePath: z.string().min(1),
+        content: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const kb = await getKBWithAccess(
+        ctx.db,
+        input.knowledgeBaseId,
+        ctx.workspaceId,
+      );
+
+      const { storage } = await createStorageForWorkspace(ctx.workspaceId);
+      await storage.upload({
+        path: `${kb.wikiStoragePath}${input.pagePath}`,
+        data: Buffer.from(input.content, "utf-8"),
+        contentType: "text/markdown",
+      });
+
+      return { success: true };
+    }),
+
   ingest: workspaceProcedure
     .input(
       z.object({
