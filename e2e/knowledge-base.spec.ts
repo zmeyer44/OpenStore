@@ -114,30 +114,22 @@ test.describe.serial("Knowledge Base flows", () => {
     // Navigate to Plugins page
     await page.getByRole("link", { name: "Plugins" }).click();
     await page.waitForTimeout(1000);
-    await expect(page.getByText("Plugin Catalog")).toBeVisible({
+    await expect(page.getByText("Available")).toBeVisible({
       timeout: 5000,
     });
     await page.screenshot({
       path: "e2e/screenshots/kb-05-plugins-page.png",
     });
 
-    // Find the Knowledge Base plugin in the catalog and install it
-    const kbCard = page
-      .locator("div.rounded-lg.border", { hasText: "Knowledge Base" })
-      .filter({ hasText: "Plugin Catalog" })
-      .locator("..")
-      .locator("div.rounded-lg.border", { hasText: "Knowledge Base" })
-      .first();
-
-    // Simpler approach: find the Install Plugin button near "Knowledge Base" text
-    const catalogSection = page.locator("section", {
-      hasText: "Plugin Catalog",
+    // Find the Knowledge Base plugin in the Available section and install it
+    const availableSection = page.locator("section", {
+      hasText: "Available",
     });
-    const kbPlugin = catalogSection.locator("div.rounded-lg.border", {
+    const kbPlugin = availableSection.locator("div.rounded-xl", {
       hasText: "Knowledge Base",
     });
     await expect(kbPlugin).toBeVisible({ timeout: 5000 });
-    await kbPlugin.getByRole("button", { name: /install plugin/i }).click();
+    await kbPlugin.getByRole("button", { name: /^install$/i }).click();
     await page.waitForTimeout(500);
 
     // Install dialog appears — just click Install (no required config fields)
@@ -154,9 +146,9 @@ test.describe.serial("Knowledge Base flows", () => {
       .click();
     await page.waitForTimeout(2000);
 
-    // Verify it moved to Installed Plugins section
+    // Verify it moved to Installed section
     const installedSection = page.locator("section", {
-      hasText: "Installed Plugins",
+      hasText: "Installed",
     });
     await expect(
       installedSection.getByText("Knowledge Base").first(),
@@ -521,16 +513,16 @@ test.describe.serial("Knowledge Base flows", () => {
 
     // Find installed Knowledge Base plugin and uninstall
     const installedSection = page.locator("section", {
-      hasText: "Installed Plugins",
+      hasText: "Installed",
     });
-    const kbPlugin = installedSection.locator("div.rounded-lg.border", {
+    const kbPlugin = installedSection.locator("div.rounded-xl", {
       hasText: "Knowledge Base",
     });
     await expect(kbPlugin).toBeVisible({ timeout: 5000 });
 
-    // Handle the confirm dialog
+    // Handle the confirm dialog — the uninstall button is a small trash icon
     page.on("dialog", (dialog) => dialog.accept());
-    await kbPlugin.getByRole("button", { name: /uninstall/i }).click();
+    await kbPlugin.locator("button[data-variant='destructive']").click();
     await page.waitForTimeout(2000);
 
     await page.screenshot({

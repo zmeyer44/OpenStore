@@ -195,13 +195,13 @@ test.describe.serial("Knowledge Base synthesis flows", () => {
     // Install KB plugin
     await page.getByRole("link", { name: "Plugins" }).click();
     await page.waitForTimeout(1000);
-    const catalogSection = page.locator("section", {
-      hasText: "Plugin Catalog",
+    const availableSection = page.locator("section", {
+      hasText: "Available",
     });
-    const kbPlugin = catalogSection.locator("div.rounded-lg.border", {
+    const kbPlugin = availableSection.locator("div.rounded-xl", {
       hasText: "Knowledge Base",
     });
-    await kbPlugin.getByRole("button", { name: /install plugin/i }).click();
+    await kbPlugin.getByRole("button", { name: /^install$/i }).click();
     await page.waitForTimeout(500);
     await page
       .locator('[data-slot="dialog-content"]')
