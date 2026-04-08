@@ -1,6 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import {
   knowledgeBases,
+  kbTags,
   kbFileIngestions,
   files,
   fileTags,
@@ -153,13 +154,17 @@ export async function autoIngestFile(params: {
 }): Promise<void> {
   const { db, workspaceId, userId, fileId } = params;
 
-  // Find KBs whose tag is assigned to this file
+  // Find KBs linked (via kbTags) to any tag assigned to this file
   const kbs = await db
     .select({
       id: knowledgeBases.id,
     })
-    .from(knowledgeBases)
-    .innerJoin(fileTags, eq(knowledgeBases.tagId, fileTags.tagId))
+    .from(kbTags)
+    .innerJoin(fileTags, eq(kbTags.tagId, fileTags.tagId))
+    .innerJoin(
+      knowledgeBases,
+      eq(kbTags.knowledgeBaseId, knowledgeBases.id),
+    )
     .where(
       and(
         eq(fileTags.fileId, fileId),
@@ -168,7 +173,15 @@ export async function autoIngestFile(params: {
       ),
     );
 
-  for (const kb of kbs) {
+  // Deduplicate: a file may match multiple tags linked to the same KB
+  const seen = new Set<string>();
+  const uniqueKbs = kbs.filter((kb) => {
+    if (seen.has(kb.id)) return false;
+    seen.add(kb.id);
+    return true;
+  });
+
+  for (const kb of uniqueKbs) {
     try {
       await ingestFileIntoKB({
         db,

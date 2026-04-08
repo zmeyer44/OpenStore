@@ -130,21 +130,24 @@ export function KBDetailPage({ id }: { id: string }) {
         </Link>
         <BookOpen className="size-4 text-muted-foreground" />
         <span className="text-sm font-medium truncate">{kb.name}</span>
-        <Badge
-          variant="secondary"
-          className="text-[10px]"
-          style={
-            kb.tagColor
-              ? {
-                  backgroundColor: `${kb.tagColor}20`,
-                  color: kb.tagColor,
-                  borderColor: `${kb.tagColor}40`,
-                }
-              : undefined
-          }
-        >
-          {kb.tagName}
-        </Badge>
+        {kb.tags.map((tag) => (
+          <Badge
+            key={tag.id}
+            variant="secondary"
+            className="text-[10px]"
+            style={
+              tag.color
+                ? {
+                    backgroundColor: `${tag.color}20`,
+                    color: tag.color,
+                    borderColor: `${tag.color}40`,
+                  }
+                : undefined
+            }
+          >
+            {tag.name}
+          </Badge>
+        ))}
 
         <div className="flex-1" />
 

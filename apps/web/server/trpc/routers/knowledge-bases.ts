@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { eq, and, asc, desc } from "drizzle-orm";
+import { eq, and, asc, desc, inArray } from "drizzle-orm";
 import { createRouter, workspaceProcedure } from "../init";
 import {
   knowledgeBases,
+  kbTags,
   kbConversations,
   kbMessages,
   kbFileIngestions,
@@ -71,7 +72,7 @@ async function streamToString(stream: ReadableStream): Promise<string> {
 
 export const knowledgeBasesRouter = createRouter({
   list: workspaceProcedure.query(async ({ ctx }) => {
-    return ctx.db
+    const kbRows = await ctx.db
       .select({
         id: knowledgeBases.id,
         name: knowledgeBases.name,
@@ -79,15 +80,49 @@ export const knowledgeBasesRouter = createRouter({
         status: knowledgeBases.status,
         lastIngestedAt: knowledgeBases.lastIngestedAt,
         createdAt: knowledgeBases.createdAt,
-        tagId: knowledgeBases.tagId,
+      })
+      .from(knowledgeBases)
+      .where(eq(knowledgeBases.workspaceId, ctx.workspaceId))
+      .orderBy(asc(knowledgeBases.name));
+
+    if (kbRows.length === 0) return [];
+
+    const tagRows = await ctx.db
+      .select({
+        knowledgeBaseId: kbTags.knowledgeBaseId,
+        tagId: tags.id,
         tagName: tags.name,
         tagSlug: tags.slug,
         tagColor: tags.color,
       })
-      .from(knowledgeBases)
-      .innerJoin(tags, eq(knowledgeBases.tagId, tags.id))
-      .where(eq(knowledgeBases.workspaceId, ctx.workspaceId))
-      .orderBy(asc(knowledgeBases.name));
+      .from(kbTags)
+      .innerJoin(tags, eq(kbTags.tagId, tags.id))
+      .where(
+        inArray(
+          kbTags.knowledgeBaseId,
+          kbRows.map((kb) => kb.id),
+        ),
+      );
+
+    const tagsByKb = new Map<
+      string,
+      { id: string; name: string; slug: string; color: string | null }[]
+    >();
+    for (const row of tagRows) {
+      const arr = tagsByKb.get(row.knowledgeBaseId) ?? [];
+      arr.push({
+        id: row.tagId,
+        name: row.tagName,
+        slug: row.tagSlug,
+        color: row.tagColor,
+      });
+      tagsByKb.set(row.knowledgeBaseId, arr);
+    }
+
+    return kbRows.map((kb) => ({
+      ...kb,
+      tags: tagsByKb.get(kb.id) ?? [],
+    }));
   }),
 
   get: workspaceProcedure
@@ -105,13 +140,8 @@ export const knowledgeBasesRouter = createRouter({
           lastLintedAt: knowledgeBases.lastLintedAt,
           wikiStoragePath: knowledgeBases.wikiStoragePath,
           createdAt: knowledgeBases.createdAt,
-          tagId: knowledgeBases.tagId,
-          tagName: tags.name,
-          tagSlug: tags.slug,
-          tagColor: tags.color,
         })
         .from(knowledgeBases)
-        .innerJoin(tags, eq(knowledgeBases.tagId, tags.id))
         .where(
           and(
             eq(knowledgeBases.id, input.id),
@@ -126,63 +156,152 @@ export const knowledgeBasesRouter = createRouter({
           message: "Knowledge base not found",
         });
       }
-      return result;
+
+      const kbTagRows = await ctx.db
+        .select({
+          tagId: tags.id,
+          tagName: tags.name,
+          tagSlug: tags.slug,
+          tagColor: tags.color,
+        })
+        .from(kbTags)
+        .innerJoin(tags, eq(kbTags.tagId, tags.id))
+        .where(eq(kbTags.knowledgeBaseId, result.id));
+
+      return {
+        ...result,
+        tags: kbTagRows.map((t) => ({
+          id: t.tagId,
+          name: t.tagName,
+          slug: t.tagSlug,
+          color: t.tagColor,
+        })),
+      };
     }),
 
   create: workspaceProcedure
     .input(createKnowledgeBaseSchema)
     .mutation(async ({ ctx, input }) => {
-      // Verify tag belongs to workspace
-      const [tag] = await ctx.db
+      const tagIds = [...new Set(input.tagIds)];
+
+      // Verify all tags belong to workspace
+      const validTags = await ctx.db
         .select({ id: tags.id, slug: tags.slug })
         .from(tags)
         .where(
-          and(eq(tags.id, input.tagId), eq(tags.workspaceId, ctx.workspaceId)),
+          and(
+            inArray(tags.id, tagIds),
+            eq(tags.workspaceId, ctx.workspaceId),
+          ),
         );
 
-      if (!tag) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Tag not found" });
+      if (validTags.length !== tagIds.length) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "One or more tags not found",
+        });
       }
 
-      const wikiStoragePath = `${ctx.workspaceId}/.kb/${tag.slug}/wiki/`;
+      const slugPart = generateTagSlug(input.name) || "kb";
+      const wikiStoragePath = `${ctx.workspaceId}/.kb/${slugPart}/wiki/`;
 
-      try {
-        const [kb] = await ctx.db
-          .insert(knowledgeBases)
-          .values({
+      const [kb] = await ctx.db
+        .insert(knowledgeBases)
+        .values({
+          workspaceId: ctx.workspaceId,
+          createdById: ctx.userId,
+          name: input.name,
+          description: input.description,
+          schemaPrompt: input.schemaPrompt ?? "",
+          wikiStoragePath,
+        })
+        .returning();
+
+      // Insert join table rows
+      await ctx.db.insert(kbTags).values(
+        tagIds.map((tagId) => ({
+          knowledgeBaseId: kb.id,
+          tagId,
+        })),
+      );
+
+      // Initialize index.md and log.md in storage
+      const { storage } = await createStorageForWorkspace(ctx.workspaceId);
+      await storage.upload({
+        path: `${wikiStoragePath}index.md`,
+        data: Buffer.from("# Wiki Index\n\nNo pages yet.\n", "utf-8"),
+        contentType: "text/markdown",
+      });
+      await storage.upload({
+        path: `${wikiStoragePath}log.md`,
+        data: Buffer.from("# Ingestion Log\n", "utf-8"),
+        contentType: "text/markdown",
+      });
+
+      // Fire-and-forget: ingest all documents with the selected tags
+      const taggedFiles = await ctx.db
+        .select({ id: files.id })
+        .from(fileTags)
+        .innerJoin(files, eq(fileTags.fileId, files.id))
+        .where(inArray(fileTags.tagId, tagIds));
+
+      if (taggedFiles.length > 0) {
+        // Deduplicate files (a file could have multiple of the selected tags)
+        const uniqueFileIds = [...new Set(taggedFiles.map((f) => f.id))];
+
+        // Set status to building while ingestion runs
+        await ctx.db
+          .update(knowledgeBases)
+          .set({ status: "building", updatedAt: new Date() })
+          .where(eq(knowledgeBases.id, kb.id));
+
+        const handler = getHandler("knowledge-base");
+        const ingestFn = handler?.ingest;
+
+        if (ingestFn) {
+          const pluginCtx = await buildPluginContext({
+            db: ctx.db,
             workspaceId: ctx.workspaceId,
-            tagId: input.tagId,
-            createdById: ctx.userId,
-            name: input.name,
-            description: input.description,
-            schemaPrompt: input.schemaPrompt ?? "",
-            wikiStoragePath,
-          })
-          .returning();
-
-        // Initialize index.md and log.md in storage
-        const { storage } = await createStorageForWorkspace(ctx.workspaceId);
-        await storage.upload({
-          path: `${wikiStoragePath}index.md`,
-          data: Buffer.from("# Wiki Index\n\nNo pages yet.\n", "utf-8"),
-          contentType: "text/markdown",
-        });
-        await storage.upload({
-          path: `${wikiStoragePath}log.md`,
-          data: Buffer.from("# Ingestion Log\n", "utf-8"),
-          contentType: "text/markdown",
-        });
-
-        return kb;
-      } catch (err: any) {
-        if (err?.code === "23505") {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "A knowledge base already exists for this tag",
+            userId: ctx.userId,
+            pluginId: kb.id,
+            config: {},
           });
+
+          void (async () => {
+            try {
+              for (const fileId of uniqueFileIds) {
+                try {
+                  await ingestFileIntoKB({
+                    db: ctx.db,
+                    workspaceId: ctx.workspaceId,
+                    userId: ctx.userId,
+                    knowledgeBaseId: kb.id,
+                    fileId,
+                  });
+                } catch {
+                  // Best-effort per file
+                }
+              }
+              await ctx.db
+                .update(knowledgeBases)
+                .set({
+                  status: "active",
+                  lastIngestedAt: new Date(),
+                  updatedAt: new Date(),
+                })
+                .where(eq(knowledgeBases.id, kb.id));
+            } catch {
+              await ctx.db
+                .update(knowledgeBases)
+                .set({ status: "error", updatedAt: new Date() })
+                .where(eq(knowledgeBases.id, kb.id))
+                .catch(() => {});
+            }
+          })();
         }
-        throw err;
       }
+
+      return kb;
     }),
 
   update: workspaceProcedure
@@ -242,13 +361,19 @@ export const knowledgeBasesRouter = createRouter({
   sources: workspaceProcedure
     .input(z.object({ knowledgeBaseId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const kb = await getKBWithAccess(
-        ctx.db,
-        input.knowledgeBaseId,
-        ctx.workspaceId,
-      );
+      await getKBWithAccess(ctx.db, input.knowledgeBaseId, ctx.workspaceId);
 
-      return ctx.db
+      // Get all tag IDs linked to this KB
+      const linkedTags = await ctx.db
+        .select({ tagId: kbTags.tagId })
+        .from(kbTags)
+        .where(eq(kbTags.knowledgeBaseId, input.knowledgeBaseId));
+
+      if (linkedTags.length === 0) return [];
+
+      const tagIds = linkedTags.map((t) => t.tagId);
+
+      const rows = await ctx.db
         .select({
           id: files.id,
           name: files.name,
@@ -266,8 +391,16 @@ export const knowledgeBasesRouter = createRouter({
             eq(kbFileIngestions.knowledgeBaseId, input.knowledgeBaseId),
           ),
         )
-        .where(eq(fileTags.tagId, kb.tagId))
+        .where(inArray(fileTags.tagId, tagIds))
         .orderBy(asc(files.name));
+
+      // Deduplicate files that match multiple tags
+      const seen = new Set<string>();
+      return rows.filter((r) => {
+        if (seen.has(r.id)) return false;
+        seen.add(r.id);
+        return true;
+      });
     }),
 
   wikiPages: workspaceProcedure
@@ -412,18 +545,35 @@ export const knowledgeBasesRouter = createRouter({
         .set({ status: "building", updatedAt: new Date() })
         .where(eq(knowledgeBases.id, kb.id));
 
-      // Get all tagged files
-      const taggedFiles = await ctx.db
-        .select({
-          id: files.id,
-          name: files.name,
-          mimeType: files.mimeType,
-          storagePath: files.storagePath,
-          storageConfigId: files.storageConfigId,
-        })
-        .from(fileTags)
-        .innerJoin(files, eq(fileTags.fileId, files.id))
-        .where(eq(fileTags.tagId, kb.tagId));
+      // Get all tag IDs linked to this KB
+      const linkedTags = await ctx.db
+        .select({ tagId: kbTags.tagId })
+        .from(kbTags)
+        .where(eq(kbTags.knowledgeBaseId, kb.id));
+
+      const tagIds = linkedTags.map((t) => t.tagId);
+
+      // Get all tagged files (deduplicated)
+      const rawFiles = tagIds.length > 0
+        ? await ctx.db
+            .select({
+              id: files.id,
+              name: files.name,
+              mimeType: files.mimeType,
+              storagePath: files.storagePath,
+              storageConfigId: files.storageConfigId,
+            })
+            .from(fileTags)
+            .innerJoin(files, eq(fileTags.fileId, files.id))
+            .where(inArray(fileTags.tagId, tagIds))
+        : [];
+
+      const seen = new Set<string>();
+      const taggedFiles = rawFiles.filter((f) => {
+        if (seen.has(f.id)) return false;
+        seen.add(f.id);
+        return true;
+      });
 
       const handler = getHandler("knowledge-base");
       const ingestFn = handler?.ingest;
