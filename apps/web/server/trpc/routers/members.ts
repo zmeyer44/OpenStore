@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gt } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
   createRouter,
@@ -34,6 +34,41 @@ export const membersRouter = createRouter({
       .where(eq(workspaceMembers.workspaceId, ctx.workspaceId));
 
     return members;
+  }),
+
+  /** List pending invites addressed to the current user's email */
+  myPendingInvites: protectedProcedure.query(async ({ ctx }) => {
+    const [user] = await ctx.db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, ctx.userId));
+
+    if (!user) return [];
+
+    const invites = await ctx.db
+      .select({
+        id: workspaceInvites.id,
+        token: workspaceInvites.token,
+        role: workspaceInvites.role,
+        expiresAt: workspaceInvites.expiresAt,
+        createdAt: workspaceInvites.createdAt,
+        workspaceName: workspaces.name,
+        workspaceSlug: workspaces.slug,
+        inviterName: users.name,
+        inviterEmail: users.email,
+      })
+      .from(workspaceInvites)
+      .innerJoin(workspaces, eq(workspaces.id, workspaceInvites.workspaceId))
+      .innerJoin(users, eq(users.id, workspaceInvites.invitedById))
+      .where(
+        and(
+          eq(workspaceInvites.email, user.email),
+          eq(workspaceInvites.status, "pending"),
+          gt(workspaceInvites.expiresAt, new Date()),
+        ),
+      );
+
+    return invites;
   }),
 
   invite: workspaceAdminProcedure

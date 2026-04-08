@@ -33,7 +33,7 @@ test.describe.serial('Workspace flows', () => {
     await page.waitForURL((url) => !url.pathname.includes('/register'), { timeout: 15000 });
     await page.screenshot({ path: 'e2e/screenshots/ws-01-onboarding.png' });
 
-    await expect(page.getByText('Create your workspace')).toBeVisible();
+    await expect(page.getByText('Get started')).toBeVisible();
   });
 
   // ── Create workspace ──────────────────────────────────────────────────
