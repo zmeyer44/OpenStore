@@ -15,7 +15,6 @@ import {
 import {
   createKnowledgeBaseSchema,
   updateKnowledgeBaseSchema,
-  generateTagSlug,
   isTextIndexable,
 } from "@locker/common";
 import { TRPCError } from "@trpc/server";
@@ -202,28 +201,32 @@ export const knowledgeBasesRouter = createRouter({
         });
       }
 
-      const slugPart = generateTagSlug(input.name) || "kb";
-      const wikiStoragePath = `${ctx.workspaceId}/.kb/${slugPart}/wiki/`;
+      const kbId = crypto.randomUUID();
+      const wikiStoragePath = `${ctx.workspaceId}/.kb/${kbId}/wiki/`;
 
-      const [kb] = await ctx.db
-        .insert(knowledgeBases)
-        .values({
-          workspaceId: ctx.workspaceId,
-          createdById: ctx.userId,
-          name: input.name,
-          description: input.description,
-          schemaPrompt: input.schemaPrompt ?? "",
-          wikiStoragePath,
-        })
-        .returning();
+      const [kb] = await ctx.db.transaction(async (tx) => {
+        const [inserted] = await tx
+          .insert(knowledgeBases)
+          .values({
+            id: kbId,
+            workspaceId: ctx.workspaceId,
+            createdById: ctx.userId,
+            name: input.name,
+            description: input.description,
+            schemaPrompt: input.schemaPrompt ?? "",
+            wikiStoragePath,
+          })
+          .returning();
 
-      // Insert join table rows
-      await ctx.db.insert(kbTags).values(
-        tagIds.map((tagId) => ({
-          knowledgeBaseId: kb.id,
-          tagId,
-        })),
-      );
+        await tx.insert(kbTags).values(
+          tagIds.map((tagId) => ({
+            knowledgeBaseId: inserted.id,
+            tagId,
+          })),
+        );
+
+        return [inserted];
+      });
 
       // Initialize index.md and log.md in storage (best-effort — the KB
       // is already created so we don't want a storage error to fail the
