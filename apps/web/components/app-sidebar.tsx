@@ -179,17 +179,20 @@ export function AppSidebar({
       key: "tracked",
     },
     {
-      href: `${prefix}/plugins`,
-      label: "Plugins",
-      icon: Puzzle,
-      key: "plugins",
-    },
-    ...pluginNavItems,
-    {
       href: `${prefix}/terminal`,
       label: "Terminal",
       icon: TerminalSquare,
       key: "terminal",
+    },
+  ];
+
+  const pluginSectionItems = [
+    ...pluginNavItems,
+    {
+      href: `${prefix}/plugins`,
+      label: "Plugins",
+      icon: Puzzle,
+      key: "plugins",
     },
   ];
 
@@ -313,6 +316,22 @@ export function AppSidebar({
                   ? pathname === prefix ||
                     pathname.startsWith(`${prefix}/folder`)
                   : pathname.startsWith(item.href);
+              return (
+                <NavItem
+                  key={item.key}
+                  href={item.href}
+                  icon={item.icon}
+                  label={item.label}
+                  isActive={isActive}
+                  collapsed={collapsed}
+                />
+              );
+            })}
+          </NavSection>
+
+          <NavSection label="Plugins" collapsed={collapsed}>
+            {pluginSectionItems.map((item) => {
+              const isActive = pathname.startsWith(item.href);
               return (
                 <NavItem
                   key={item.key}
