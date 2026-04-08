@@ -202,6 +202,9 @@ export const knowledgeBasesRouter = createRouter({
         });
       }
 
+      const slugPart = generateTagSlug(input.name) || "kb";
+      const wikiStoragePath = `${ctx.workspaceId}/.kb/${slugPart}/wiki/`;
+
       const [kb] = await ctx.db
         .insert(knowledgeBases)
         .values({
@@ -210,17 +213,9 @@ export const knowledgeBasesRouter = createRouter({
           name: input.name,
           description: input.description,
           schemaPrompt: input.schemaPrompt ?? "",
-          // Placeholder — overwritten below with the real ID-based path
-          wikiStoragePath: "",
+          wikiStoragePath,
         })
         .returning();
-
-      const slugPart = generateTagSlug(input.name) || "kb";
-      const wikiStoragePath = `${ctx.workspaceId}/.kb/${slugPart}-${kb.id.slice(0, 8)}/wiki/`;
-      await ctx.db
-        .update(knowledgeBases)
-        .set({ wikiStoragePath })
-        .where(eq(knowledgeBases.id, kb.id));
 
       // Insert join table rows
       await ctx.db.insert(kbTags).values(
@@ -230,18 +225,24 @@ export const knowledgeBasesRouter = createRouter({
         })),
       );
 
-      // Initialize index.md and log.md in storage
-      const { storage } = await createStorageForWorkspace(ctx.workspaceId);
-      await storage.upload({
-        path: `${wikiStoragePath}index.md`,
-        data: Buffer.from("# Wiki Index\n\nNo pages yet.\n", "utf-8"),
-        contentType: "text/markdown",
-      });
-      await storage.upload({
-        path: `${wikiStoragePath}log.md`,
-        data: Buffer.from("# Ingestion Log\n", "utf-8"),
-        contentType: "text/markdown",
-      });
+      // Initialize index.md and log.md in storage (best-effort — the KB
+      // is already created so we don't want a storage error to fail the
+      // whole mutation).
+      try {
+        const { storage } = await createStorageForWorkspace(ctx.workspaceId);
+        await storage.upload({
+          path: `${wikiStoragePath}index.md`,
+          data: Buffer.from("# Wiki Index\n\nNo pages yet.\n", "utf-8"),
+          contentType: "text/markdown",
+        });
+        await storage.upload({
+          path: `${wikiStoragePath}log.md`,
+          data: Buffer.from("# Ingestion Log\n", "utf-8"),
+          contentType: "text/markdown",
+        });
+      } catch {
+        // Storage init is best-effort; ingestAll will recreate these files
+      }
 
       // Fire-and-forget: ingest all documents with the selected tags
       const taggedFiles = await ctx.db

@@ -292,11 +292,11 @@ export function ChatMessage({
                     <span className="font-mono">
                       Tool: {(part.toolName as string) || "unknown"}
                     </span>
-                    {part.state === "output-available" && part.output && (
+                    {part.state === "output-available" && part.output != null ? (
                       <pre className="mt-1 text-[10px] overflow-auto">
                         {JSON.stringify(part.output, null, 2)}
                       </pre>
-                    )}
+                    ) : null}
                   </div>
                 );
               }
