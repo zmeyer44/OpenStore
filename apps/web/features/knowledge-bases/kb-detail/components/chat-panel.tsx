@@ -3,13 +3,9 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { Send, Plus, Loader2, MessageSquare, Trash2 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Plus, MessageSquare, Trash2 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
@@ -18,6 +14,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+
+import {
+  ChatInput,
+  AVAILABLE_MODELS,
+  type ModelId,
+} from "./chat-input";
+import { ChatMessage, StreamingIndicator } from "./chat-message";
 
 export function ChatPanel({
   knowledgeBaseId,
@@ -29,6 +32,10 @@ export function ChatPanel({
   const utils = trpc.useUtils();
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
+  const [selectedModel, setSelectedModel] = useState<ModelId>(
+    AVAILABLE_MODELS[0].id,
+  );
+  const [attachments, setAttachments] = useState<File[]>([]);
 
   const { data: conversations } = trpc.knowledgeBases.conversations.useQuery({
     knowledgeBaseId,
@@ -71,11 +78,15 @@ export function ChatPanel({
   }, [conversationData?.messages]);
 
   // Keep a stable transport so useChat doesn't reset when
-  // conversationId transitions from null → UUID mid-session.
-  // Mutate the same object in place so the transport sees current values.
-  const transportBody = useRef({ knowledgeBaseId, conversationId });
+  // conversationId transitions from null -> UUID mid-session.
+  const transportBody = useRef({
+    knowledgeBaseId,
+    conversationId,
+    model: selectedModel,
+  });
   transportBody.current.knowledgeBaseId = knowledgeBaseId;
   transportBody.current.conversationId = conversationId;
+  transportBody.current.model = selectedModel;
 
   const transport = useMemo(
     () =>
@@ -83,7 +94,6 @@ export function ChatPanel({
         api: "/api/kb/chat",
         body: transportBody.current,
       }),
-    // Only recreate when the KB itself changes, not on conversationId updates
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [knowledgeBaseId],
   );
@@ -100,10 +110,10 @@ export function ChatPanel({
     setMessages(initialMessages);
   }, [conversationId, initialMessages, setMessages]);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleNewConversation = () => {
@@ -116,6 +126,7 @@ export function ChatPanel({
     if (!inputValue.trim() || !conversationId) return;
     sendMessage({ text: inputValue });
     setInputValue("");
+    setAttachments([]);
   };
 
   // Auto-select first conversation or create one
@@ -128,7 +139,7 @@ export function ChatPanel({
   return (
     <div className="flex flex-col h-full">
       {/* Conversation header */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/30">
+      <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/20">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="max-w-[200px]">
@@ -178,10 +189,19 @@ export function ChatPanel({
       </div>
 
       {!conversationId ? (
-        <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+        <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-3">
-            <MessageSquare className="size-8 mx-auto text-muted-foreground/50" />
-            <p>Start a conversation to chat with your knowledge base.</p>
+            <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 mx-auto">
+              <MessageSquare className="size-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">
+                Start a conversation
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Chat with your knowledge base to find answers.
+              </p>
+            </div>
             <Button size="sm" onClick={handleNewConversation}>
               <Plus />
               New Conversation
@@ -191,147 +211,43 @@ export function ChatPanel({
       ) : (
         <>
           {/* Messages */}
-          <ScrollArea className="flex-1 px-4 py-4">
-            <div className="max-w-3xl mx-auto space-y-4">
+          <ScrollArea className="flex-1">
+            <div className="divide-y divide-border/40">
               {messages.length === 0 && (
-                <div className="text-center text-sm text-muted-foreground py-8">
+                <div className="text-center text-sm text-muted-foreground py-16">
                   Ask a question about your knowledge base.
                 </div>
               )}
               {messages.map((message: UIMessage) => (
-                <div
+                <ChatMessage
                   key={message.id}
-                  className={cn(
-                    "flex",
-                    message.role === "user" ? "justify-end" : "justify-start",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "rounded-lg px-4 py-2 max-w-[80%]",
-                      message.role === "user" ? "bg-primary/8" : "bg-muted",
-                    )}
-                  >
-                    {message.parts.map((part, partIdx: number) => {
-                      if (part.type === "text") {
-                        return (
-                          <div
-                            key={partIdx}
-                            className="prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-code:text-[0.85em] dark:prose-invert"
-                          >
-                            <WikiLinkedMarkdown
-                              content={part.text}
-                              onNavigateToPage={onNavigateToPage}
-                            />
-                          </div>
-                        );
-                      }
-                      if (part.type.startsWith("tool-")) {
-                        return (
-                          <div
-                            key={partIdx}
-                            className="text-xs text-muted-foreground border rounded p-2 my-1"
-                          >
-                            <span className="font-mono">
-                              Tool:{" "}
-                              {("toolName" in part && part.toolName) ||
-                                "unknown"}
-                            </span>
-                            {"state" in part &&
-                              part.state === "output-available" &&
-                              "output" in part && (
-                                <pre className="mt-1 text-[10px] overflow-auto">
-                                  {JSON.stringify(part.output, null, 2)}
-                                </pre>
-                              )}
-                          </div>
-                        );
-                      }
-                      return null;
-                    })}
-                  </div>
-                </div>
+                  role={message.role}
+                  parts={message.parts as Array<{ type: string; text?: string; [key: string]: unknown }>}
+                  onNavigateToPage={onNavigateToPage}
+                />
               ))}
               {isStreaming &&
                 messages[messages.length - 1]?.role !== "assistant" && (
-                  <div className="flex justify-start">
-                    <div className="bg-muted rounded-lg px-4 py-2">
-                      <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                    </div>
-                  </div>
+                  <StreamingIndicator />
                 )}
-              <div ref={messagesEndRef} />
             </div>
+            <div ref={scrollRef} />
           </ScrollArea>
 
           {/* Input */}
-          <div className="border-t p-4">
-            <div className="max-w-3xl mx-auto flex gap-2">
-              <Textarea
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Ask a question..."
-                rows={1}
-                className="resize-none min-h-10"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-              />
-              <Button
-                type="button"
-                size="sm"
-                disabled={!inputValue.trim() || isStreaming}
-                className="self-end"
-                onClick={handleSend}
-              >
-                <Send className="size-4" />
-              </Button>
-            </div>
-          </div>
+          <ChatInput
+            value={inputValue}
+            onChange={setInputValue}
+            onSubmit={handleSend}
+            model={selectedModel}
+            onModelChange={setSelectedModel}
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
+            disabled={!conversationId}
+            isSending={isStreaming}
+          />
         </>
       )}
     </div>
-  );
-}
-
-/** Renders markdown with clickable [[wiki-link]] support. */
-function WikiLinkedMarkdown({
-  content,
-  onNavigateToPage,
-}: {
-  content: string;
-  onNavigateToPage?: (pagePath: string) => void;
-}) {
-  // Split on [[...]] to get alternating text/link segments
-  const parts = content.split(/(\[\[[^\]]+\]\])/g);
-
-  return (
-    <>
-      {parts.map((segment, i) => {
-        const match = segment.match(/^\[\[([^\]]+)\]\]$/);
-        if (match) {
-          const slug = match[1];
-          const targetPath = slug.endsWith(".md") ? slug : `${slug}.md`;
-          return (
-            <button
-              key={i}
-              onClick={() => onNavigateToPage?.(targetPath)}
-              className="inline text-primary underline cursor-pointer hover:text-primary/80 font-medium"
-            >
-              {slug}
-            </button>
-          );
-        }
-        if (!segment) return null;
-        return (
-          <ReactMarkdown key={i} remarkPlugins={[remarkGfm]}>
-            {segment}
-          </ReactMarkdown>
-        );
-      })}
-    </>
   );
 }
