@@ -33,7 +33,14 @@ RUN pnpm turbo build --filter=@locker/web
 # ── Stage 4: Migrator ───────────────────────────────────────────────────────
 # Used as an init container to run DB migrations before the app starts.
 FROM base AS migrator
-COPY --from=builder /app/ /app/
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/database/node_modules ./packages/database/node_modules
+COPY packages/database/drizzle ./packages/database/drizzle
+COPY packages/database/drizzle.config.ts ./packages/database/drizzle.config.ts
+COPY packages/database/package.json ./packages/database/package.json
+COPY packages/database/src ./packages/database/src
+COPY packages/common ./packages/common
+COPY package.json turbo.json pnpm-workspace.yaml ./
 CMD ["pnpm", "db:migrate"]
 
 # ── Stage 5: Production image ────────────────────────────────────────────────

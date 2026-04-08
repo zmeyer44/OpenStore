@@ -2,6 +2,7 @@ services:
   # ── PostgreSQL ───────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
@@ -20,11 +21,12 @@ services:
   qmd:
     build:
       context: ./services/qmd
+    restart: unless-stopped
     ports:
       - "9600:9600"
     environment:
       QMD_PORT: 9600
-      QMD_API_SECRET: ${QMD_API_SECRET:-openstore-dev-secret}
+      QMD_API_SECRET: ${QMD_API_SECRET:?Set QMD_API_SECRET in .env — generate with: openssl rand -base64 32}
     volumes:
       - qmd_data:/data/qmd
     healthcheck:
@@ -37,11 +39,12 @@ services:
   fts:
     build:
       context: ./services/fts
+    restart: unless-stopped
     ports:
       - "9700:9700"
     environment:
       FTS_PORT: 9700
-      FTS_API_SECRET: ${FTS_API_SECRET:-openstore-dev-secret}
+      FTS_API_SECRET: ${FTS_API_SECRET:?Set FTS_API_SECRET in .env — generate with: openssl rand -base64 32}
     volumes:
       - fts_data:/data/fts
     healthcheck:
@@ -68,6 +71,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runner
+    restart: unless-stopped
     ports:
       - "3000:3000"
     depends_on:
@@ -83,8 +87,8 @@ services:
       # Database
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/locker
 
-      # Authentication
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-openstore-docker-dev-secret}
+      # Authentication — REQUIRED, no default
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env — generate with: openssl rand -base64 32}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
 
       # App
@@ -113,9 +117,9 @@ services:
 
       # Search services (internal Docker network)
       QMD_SERVICE_URL: http://qmd:9600
-      QMD_API_SECRET: ${QMD_API_SECRET:-openstore-dev-secret}
+      QMD_API_SECRET: ${QMD_API_SECRET:?Set QMD_API_SECRET in .env}
       FTS_SERVICE_URL: http://fts:9700
-      FTS_API_SECRET: ${FTS_API_SECRET:-openstore-dev-secret}
+      FTS_API_SECRET: ${FTS_API_SECRET:?Set FTS_API_SECRET in .env}
 
       # Email (optional)
       RESEND_API_KEY: ${RESEND_API_KEY:-}
