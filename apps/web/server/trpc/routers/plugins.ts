@@ -608,16 +608,20 @@ export const pluginsRouter = createRouter({
         .limit(1);
 
       if (plugin) {
-        // Clean up any files stored by this plugin
-        const { createStorageForWorkspace } = await import("../../storage");
-        const { cleanupPluginStorage } = await import("../../plugins/plugin-storage");
-        const { storage } = await createStorageForWorkspace(ctx.workspaceId);
-        await cleanupPluginStorage({
-          db: ctx.db,
-          storage,
-          workspaceId: ctx.workspaceId,
-          pluginSlug: plugin.pluginSlug,
-        });
+        // Best-effort cleanup — don't block uninstall if storage is unavailable
+        try {
+          const { createStorageForWorkspace } = await import("../../storage");
+          const { cleanupPluginStorage } = await import("../../plugins/plugin-storage");
+          const { storage } = await createStorageForWorkspace(ctx.workspaceId);
+          await cleanupPluginStorage({
+            db: ctx.db,
+            storage,
+            workspaceId: ctx.workspaceId,
+            pluginSlug: plugin.pluginSlug,
+          });
+        } catch {
+          // Proceed with uninstall even if storage cleanup fails
+        }
       }
 
       await ctx.db
