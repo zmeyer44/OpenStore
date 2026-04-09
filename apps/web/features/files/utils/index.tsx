@@ -60,6 +60,7 @@ export function getViewerType(mimeType: string, name: string): ViewerType {
   const ext = getFileExtension(name);
   if (ext === "md" || ext === "mdx" || mimeType === "text/markdown")
     return "markdown";
+  if (ext === "csv" || mimeType === "text/csv") return "csv";
   if (mimeType.startsWith("text/") || isTextIndexable(mimeType)) return "text";
   if (CODE_EXTENSIONS.has(ext)) return "text";
   return "unsupported";

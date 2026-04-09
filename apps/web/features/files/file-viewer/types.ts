@@ -4,5 +4,6 @@ export type ViewerType =
   | "audio"
   | "pdf"
   | "markdown"
+  | "csv"
   | "text"
   | "unsupported";

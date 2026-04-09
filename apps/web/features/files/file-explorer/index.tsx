@@ -29,7 +29,7 @@ import { FileViewToggle } from "./components/file-view-toggle";
 import { FileGridCard } from "./components/file-grid-card";
 import { FolderGridCard } from "./components/folder-grid-card";
 
-const STORAGE_KEY = "openstore:file-view-preference";
+const STORAGE_KEY = "locker:file-view-preference";
 
 export function FileExplorer({ folderId }: { folderId: string | null }) {
   const router = useRouter();
@@ -371,54 +371,54 @@ export function FileExplorer({ folderId }: { folderId: string | null }) {
               </div>
             )}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {files.map((file) => (
-              <FileGridCard
-                key={file.id}
-                file={file}
-                uploader={userMap[file.userId]}
-                transcriptionStatus={transcriptionStatuses[file.id]}
-                pluginActions={filePluginActions}
-                onClick={() =>
-                  router.push(`/w/${workspace.slug}/file/${file.id}`)
-                }
-                onDownload={() => handleDownload(file.id)}
-                onRename={() =>
-                  setRenameTarget({
-                    id: file.id,
-                    name: file.name,
-                    type: "file",
-                  })
-                }
-                onShare={() =>
-                  setShareTarget({
-                    id: file.id,
-                    name: file.name,
-                    type: "file",
-                  })
-                }
-                onTrack={() =>
-                  setTrackTarget({
-                    id: file.id,
-                    name: file.name,
-                    type: "file",
-                  })
-                }
-                onEditTags={() => setTagTarget(file.id)}
-                onDelete={() => deleteFile.mutate({ id: file.id })}
-                onPluginAction={(action) =>
-                  handlePluginAction(action, "file", file.id)
-                }
-                onViewTranscription={() =>
-                  setTranscriptionTarget({
-                    id: file.id,
-                    name: file.name,
-                  })
-                }
-                onGenerateTranscription={() =>
-                  generateTranscription.mutate({ fileId: file.id })
-                }
-              />
-            ))}
+              {files.map((file) => (
+                <FileGridCard
+                  key={file.id}
+                  file={file}
+                  uploader={userMap[file.userId]}
+                  transcriptionStatus={transcriptionStatuses[file.id]}
+                  pluginActions={filePluginActions}
+                  onClick={() =>
+                    router.push(`/w/${workspace.slug}/file/${file.id}`)
+                  }
+                  onDownload={() => handleDownload(file.id)}
+                  onRename={() =>
+                    setRenameTarget({
+                      id: file.id,
+                      name: file.name,
+                      type: "file",
+                    })
+                  }
+                  onShare={() =>
+                    setShareTarget({
+                      id: file.id,
+                      name: file.name,
+                      type: "file",
+                    })
+                  }
+                  onTrack={() =>
+                    setTrackTarget({
+                      id: file.id,
+                      name: file.name,
+                      type: "file",
+                    })
+                  }
+                  onEditTags={() => setTagTarget(file.id)}
+                  onDelete={() => deleteFile.mutate({ id: file.id })}
+                  onPluginAction={(action) =>
+                    handlePluginAction(action, "file", file.id)
+                  }
+                  onViewTranscription={() =>
+                    setTranscriptionTarget({
+                      id: file.id,
+                      name: file.name,
+                    })
+                  }
+                  onGenerateTranscription={() =>
+                    generateTranscription.mutate({ fileId: file.id })
+                  }
+                />
+              ))}
             </div>
           </div>
         ) : (

@@ -145,6 +145,7 @@ export function AppSidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const utils = trpc.useUtils();
   const [collapsed, setCollapsed] = useState(false);
 
   const slugMatch = pathname.match(/\/w\/([^/]+)/);
@@ -237,7 +238,12 @@ export function AppSidebar({
                     {workspacesList?.map((ws) => (
                       <DropdownMenuItem
                         key={ws.id}
-                        onSelect={() => router.push(`/w/${ws.slug}`)}
+                        onSelect={() => {
+                          if (ws.id !== currentWorkspace.id) {
+                            void utils.invalidate();
+                          }
+                          router.push(`/w/${ws.slug}`);
+                        }}
                         className={
                           ws.id === currentWorkspace.id ? "bg-accent" : ""
                         }

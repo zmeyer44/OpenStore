@@ -23,10 +23,12 @@ export async function POST(req: NextRequest) {
     messages,
     knowledgeBaseId,
     conversationId,
+    model,
   } = body as {
     messages: UIMessage[];
     knowledgeBaseId: string;
     conversationId: string;
+    model?: string;
   };
 
   if (!knowledgeBaseId || !conversationId || !messages?.length) {
@@ -125,13 +127,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Build plugin context
+  // Build plugin context — pass model override if the client specified one
   const pluginCtx = await buildPluginContext({
     db,
     workspaceId: kb.workspaceId,
     userId: session.user.id,
     pluginId: kb.id,
-    config: {},
+    config: model ? { model } : {},
   });
 
   // Convert UIMessages to ModelMessages for the LLM

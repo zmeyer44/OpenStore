@@ -28,9 +28,6 @@ export const knowledgeBases = pgTable(
     workspaceId: uuid("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
-    tagId: uuid("tag_id")
-      .notNull()
-      .references(() => tags.id, { onDelete: "cascade" }),
     createdById: text("created_by_id").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -45,12 +42,26 @@ export const knowledgeBases = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
+  (table) => [index("knowledge_bases_workspace_idx").on(table.workspaceId)],
+);
+
+// Many-to-many join between knowledge bases and tags
+export const kbTags = pgTable(
+  "kb_tags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    knowledgeBaseId: uuid("knowledge_base_id")
+      .notNull()
+      .references(() => knowledgeBases.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
   (table) => [
-    index("knowledge_bases_workspace_idx").on(table.workspaceId),
-    uniqueIndex("knowledge_bases_workspace_tag_idx").on(
-      table.workspaceId,
-      table.tagId,
-    ),
+    uniqueIndex("kb_tags_kb_tag_idx").on(table.knowledgeBaseId, table.tagId),
+    index("kb_tags_kb_idx").on(table.knowledgeBaseId),
+    index("kb_tags_tag_idx").on(table.tagId),
   ],
 );
 
@@ -126,17 +137,25 @@ export const knowledgeBasesRelations = relations(
       fields: [knowledgeBases.workspaceId],
       references: [workspaces.id],
     }),
-    tag: one(tags, {
-      fields: [knowledgeBases.tagId],
-      references: [tags.id],
-    }),
     createdBy: one(users, {
       fields: [knowledgeBases.createdById],
       references: [users.id],
     }),
+    kbTags: many(kbTags),
     conversations: many(kbConversations),
   }),
 );
+
+export const kbTagsRelations = relations(kbTags, ({ one }) => ({
+  knowledgeBase: one(knowledgeBases, {
+    fields: [kbTags.knowledgeBaseId],
+    references: [knowledgeBases.id],
+  }),
+  tag: one(tags, {
+    fields: [kbTags.tagId],
+    references: [tags.id],
+  }),
+}));
 
 export const kbConversationsRelations = relations(
   kbConversations,

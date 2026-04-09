@@ -190,7 +190,7 @@ export const setFileTagsSchema = z.object({
 });
 
 export const createKnowledgeBaseSchema = z.object({
-  tagId: z.string().uuid(),
+  tagIds: z.array(z.string().uuid()).min(1),
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
   schemaPrompt: z.string().max(10000).optional(),

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { eq, and, asc, inArray } from "drizzle-orm";
 import { createRouter, workspaceProcedure } from "../init";
-import { tags, fileTags, files, knowledgeBases } from "@locker/database";
+import { tags, fileTags, files, kbTags, knowledgeBases } from "@locker/database";
 import {
   createTagSchema,
   updateTagSchema,
@@ -159,14 +159,18 @@ export const tagsRouter = createRouter({
         .innerJoin(tags, eq(fileTags.tagId, tags.id))
         .where(eq(fileTags.fileId, fileId));
 
-      // Auto-ingest: if any new tags belong to a KB, ingest the file
+      // Auto-ingest: if any new tags are linked to a KB, ingest the file
       if (tagIds.length > 0) {
         const kbsForTags = await ctx.db
           .select({ id: knowledgeBases.id })
-          .from(knowledgeBases)
+          .from(kbTags)
+          .innerJoin(
+            knowledgeBases,
+            eq(kbTags.knowledgeBaseId, knowledgeBases.id),
+          )
           .where(
             and(
-              inArray(knowledgeBases.tagId, tagIds),
+              inArray(kbTags.tagId, tagIds),
               eq(knowledgeBases.workspaceId, ctx.workspaceId),
               eq(knowledgeBases.status, "active"),
             ),

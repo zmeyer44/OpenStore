@@ -27,13 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 const DEFAULT_SCHEMA_PROMPT = `Organize information into clear topic pages. Each page should cover one concept or entity.
@@ -52,7 +46,7 @@ export function KBListPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [tagId, setTagId] = useState("");
+  const [tagIds, setTagIds] = useState<string[]>([]);
   const [description, setDescription] = useState("");
   const [schemaPrompt, setSchemaPrompt] = useState(DEFAULT_SCHEMA_PROMPT);
 
@@ -77,14 +71,16 @@ export function KBListPage() {
 
   function resetForm() {
     setName("");
-    setTagId("");
+    setTagIds([]);
     setDescription("");
     setSchemaPrompt(DEFAULT_SCHEMA_PROMPT);
   }
 
-  // Filter out tags already used by a KB
-  const usedTagIds = new Set(knowledgeBases?.map((kb) => kb.tagId) ?? []);
-  const availableTags = allTags?.filter((t) => !usedTagIds.has(t.id)) ?? [];
+  function toggleTag(id: string) {
+    setTagIds((prev) =>
+      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id],
+    );
+  }
 
   return (
     <div>
@@ -146,22 +142,25 @@ export function KBListPage() {
                     <Trash2 className="size-3.5" />
                   </button>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant="secondary"
-                    className="text-[10px]"
-                    style={
-                      kb.tagColor
-                        ? {
-                            backgroundColor: `${kb.tagColor}20`,
-                            color: kb.tagColor,
-                            borderColor: `${kb.tagColor}40`,
-                          }
-                        : undefined
-                    }
-                  >
-                    {kb.tagName}
-                  </Badge>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {kb.tags.map((tag) => (
+                    <Badge
+                      key={tag.id}
+                      variant="secondary"
+                      className="text-[10px]"
+                      style={
+                        tag.color
+                          ? {
+                              backgroundColor: `${tag.color}20`,
+                              color: tag.color,
+                              borderColor: `${tag.color}40`,
+                            }
+                          : undefined
+                      }
+                    >
+                      {tag.name}
+                    </Badge>
+                  ))}
                   <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded bg-muted text-muted-foreground">
                     {kb.status}
                   </span>
@@ -190,8 +189,8 @@ export function KBListPage() {
           <DialogHeader>
             <DialogTitle>Create Knowledge Base</DialogTitle>
             <DialogDescription>
-              Select a tag to bind this knowledge base to. Files with this tag
-              will be source documents for the wiki.
+              Select one or more tags to bind this knowledge base to. Files with
+              any of the selected tags will be source documents for the wiki.
             </DialogDescription>
           </DialogHeader>
 
@@ -206,25 +205,41 @@ export function KBListPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Tag *</label>
-              <Select value={tagId} onValueChange={setTagId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a tag" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableTags.map((tag) => (
-                    <SelectItem key={tag.id} value={tag.id}>
-                      {tag.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {availableTags.length === 0 && (
+              <label className="text-sm font-medium">Tags *</label>
+              {!allTags || allTags.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  No available tags. Create a tag first, or each tag can only be
-                  used by one knowledge base.
+                  No tags available. Create a tag first.
                 </p>
+              ) : (
+                <div className="rounded-md border p-3 space-y-1 max-h-40 overflow-y-auto">
+                  {allTags.map((tag) => (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() => toggleTag(tag.id)}
+                      className={cn(
+                        "flex items-center gap-2 w-full rounded px-2 py-1.5 text-sm transition-colors",
+                        tagIds.includes(tag.id)
+                          ? "bg-primary/10 text-primary"
+                          : "hover:bg-muted",
+                      )}
+                    >
+                      <span
+                        className="size-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: tag.color ?? "#888" }}
+                      />
+                      <span className="flex-1 text-left">{tag.name}</span>
+                      {tagIds.includes(tag.id) && (
+                        <span className="text-xs">&#10003;</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               )}
+              <p className="text-xs text-muted-foreground">
+                Files with any of the selected tags will be source documents for
+                this knowledge base.
+              </p>
             </div>
 
             <div className="space-y-1.5">
@@ -261,12 +276,12 @@ export function KBListPage() {
               onClick={() =>
                 createMutation.mutate({
                   name,
-                  tagId,
+                  tagIds,
                   description: description || undefined,
                   schemaPrompt: schemaPrompt || undefined,
                 })
               }
-              disabled={!name || !tagId || createMutation.isPending}
+              disabled={!name || tagIds.length === 0 || createMutation.isPending}
             >
               {createMutation.isPending && (
                 <Loader2 className="animate-spin" />

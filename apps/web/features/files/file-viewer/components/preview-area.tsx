@@ -6,6 +6,7 @@ import { AudioPreview } from "./audio-preview";
 import { PdfPreview } from "./pdf-preview";
 import { MarkdownPreview } from "./markdown-preview";
 import { TextPreview } from "./text-preview";
+import { CsvPreview } from "./csv-preview";
 import { UnsupportedPreview } from "./unsupported-preview";
 
 export function PreviewArea({
@@ -42,6 +43,8 @@ export function PreviewArea({
       return <PdfPreview url={previewUrl} />;
     case "markdown":
       return <MarkdownPreview content={textContent} name={file.name} />;
+    case "csv":
+      return <CsvPreview content={textContent} name={file.name} />;
     case "text":
       return <TextPreview content={textContent} name={file.name} />;
     case "unsupported":

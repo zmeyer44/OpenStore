@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { FileText, Loader2, Pencil, Eye, Save, X } from "lucide-react";
+import { FileText, Loader2, Pencil, Eye, Save, X, List, Network } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { trpc } from "@/lib/trpc/client";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
+import { WikiGraph } from "./wiki-graph";
 
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
@@ -20,6 +21,7 @@ export function WikiBrowser({
   knowledgeBaseId: string;
   initialPage?: string | null;
 }) {
+  const [viewMode, setViewMode] = useState<"list" | "graph">("list");
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -75,6 +77,7 @@ export function WikiBrowser({
     setEditing(false);
     setDraft("");
     setSelectedPage(path);
+    setViewMode("list");
   }
 
   // Custom renderer for wiki links [[page-slug]]
@@ -85,14 +88,47 @@ export function WikiBrowser({
     );
   };
 
+  if (viewMode === "graph") {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-2 border-b px-4 py-2">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex-1">
+            Graph View
+          </span>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => setViewMode("list")}
+          >
+            <List className="size-3" />
+            List
+          </Button>
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <WikiGraph
+            knowledgeBaseId={knowledgeBaseId}
+            onSelectPage={handleSelectPage}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full">
       {/* Page list sidebar */}
       <div className="w-56 border-r shrink-0">
-        <div className="p-3 border-b">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <div className="flex items-center gap-2 p-3 border-b">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex-1">
             Pages
           </p>
+          <button
+            onClick={() => setViewMode("graph")}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            title="Graph view"
+          >
+            <Network className="size-3.5" />
+          </button>
         </div>
         <ScrollArea className="h-[calc(100%-41px)]">
           {pagesLoading ? (
