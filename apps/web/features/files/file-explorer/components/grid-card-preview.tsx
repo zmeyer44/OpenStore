@@ -126,6 +126,108 @@ const TextThumbnail = memo(function TextThumbnail({ url }: { url: string }) {
 });
 
 /* ------------------------------------------------------------------ */
+/*  DOCX document thumbnail (docx-preview first-page render)           */
+/* ------------------------------------------------------------------ */
+
+const DocxThumbnail = memo(function DocxThumbnail({ url }: { url: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        if (cancelled) return;
+
+        const { renderAsync } = await import("docx-preview");
+
+        // Render into a hidden off-screen container to get the first page
+        const offscreen = document.createElement("div");
+        offscreen.style.position = "absolute";
+        offscreen.style.left = "-9999px";
+        offscreen.style.top = "0";
+        document.body.appendChild(offscreen);
+
+        const styleEl = document.createElement("div");
+        offscreen.appendChild(styleEl);
+
+        await renderAsync(blob, offscreen, styleEl, {
+          breakPages: true,
+          ignoreLastRenderedPageBreak: false,
+          inWrapper: true,
+          className: "docx-thumb",
+          ignoreFonts: false,
+          useBase64URL: true,
+          renderHeaders: true,
+          renderFooters: true,
+          renderFootnotes: false,
+          renderEndnotes: false,
+        });
+
+        if (cancelled) {
+          document.body.removeChild(offscreen);
+          return;
+        }
+
+        // Grab the first page section
+        const firstPage = offscreen.querySelector<HTMLElement>(
+          "section.docx-thumb",
+        );
+
+        if (firstPage && container) {
+          const pageWidth = firstPage.offsetWidth || 816;
+          const pageHeight = firstPage.offsetHeight || 1056;
+          const clone = firstPage.cloneNode(true) as HTMLElement;
+
+          // Also grab and clone the style element so formatting is preserved
+          const styles = offscreen.querySelectorAll("style");
+          const styleClones = Array.from(styles).map((s) =>
+            s.cloneNode(true),
+          );
+
+          const scale = container.clientWidth / pageWidth;
+          clone.style.transform = `scale(${scale})`;
+          clone.style.transformOrigin = "top left";
+          clone.style.position = "absolute";
+          clone.style.top = "0";
+          clone.style.left = "0";
+
+          container.style.height = `${pageHeight * scale}px`;
+          container.innerHTML = "";
+          for (const s of styleClones) container.appendChild(s);
+          container.appendChild(clone);
+
+          setReady(true);
+        }
+
+        document.body.removeChild(offscreen);
+      } catch {
+        /* silent fail — icon fallback will show */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
+  return (
+    <div
+      ref={containerRef}
+      className={cn(
+        "absolute inset-0 overflow-hidden transition-opacity duration-300",
+        ready ? "opacity-100" : "opacity-0",
+      )}
+    />
+  );
+});
+
+/* ------------------------------------------------------------------ */
 /*  Main preview component                                             */
 /* ------------------------------------------------------------------ */
 
@@ -150,12 +252,17 @@ export function GridCardPreview({
   const isImage = category === "image";
   const isVideo = category === "video";
   const ext = getFileExtension(fileName);
+  const isDocx =
+    ext === "docx" ||
+    mimeType ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   const isText =
     !isPdf &&
+    !isDocx &&
     (mimeType.startsWith("text/") ||
       isTextIndexable(mimeType) ||
       CODE_EXTENSIONS.has(ext));
-  const hasPreview = isImage || isPdf || isVideo || isText;
+  const hasPreview = isImage || isPdf || isVideo || isText || isDocx;
 
   // Observe visibility
   useEffect(() => {
@@ -196,7 +303,8 @@ export function GridCardPreview({
         mimeType={mimeType}
         className={cn(
           "size-10 opacity-30 transition-opacity duration-300",
-          (imgLoaded || (isPdf && url) || (isText && url)) && "opacity-0",
+          (imgLoaded || (isPdf && url) || (isDocx && url) || (isText && url)) &&
+            "opacity-0",
         )}
       />
 
@@ -215,6 +323,9 @@ export function GridCardPreview({
 
       {/* PDF first-page preview */}
       {isPdf && url && <PdfThumbnail url={url} />}
+
+      {/* DOCX document preview */}
+      {isDocx && url && <DocxThumbnail url={url} />}
 
       {/* Text document preview */}
       {isText && url && <TextThumbnail url={url} />}

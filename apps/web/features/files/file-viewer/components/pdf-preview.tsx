@@ -1,4 +1,10 @@
-import { PDFViewer } from "@/components/pdf-viewer";
+import dynamic from "next/dynamic";
+
+const PDFViewer = dynamic(
+  () =>
+    import("@/components/pdf-viewer").then((m) => ({ default: m.PDFViewer })),
+  { ssr: false },
+);
 
 export function PdfPreview({ url }: { url: string | null }) {
   if (!url) return null;

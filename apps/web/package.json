@@ -32,6 +32,7 @@
     "clsx": "^2.1.1",
     "d3-force": "^3.0.0",
     "date-fns": "^4.1.0",
+    "docx-preview": "^0.3.7",
     "drizzle-orm": "^0.45.1",
     "geist": "^1.7.0",
     "just-bash": "^2.14.0",

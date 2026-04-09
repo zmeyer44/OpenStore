@@ -3,6 +3,7 @@ export type ViewerType =
   | "video"
   | "audio"
   | "pdf"
+  | "docx"
   | "markdown"
   | "csv"
   | "text"

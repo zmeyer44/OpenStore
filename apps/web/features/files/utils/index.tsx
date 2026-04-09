@@ -58,6 +58,12 @@ export function getViewerType(mimeType: string, name: string): ViewerType {
   if (mimeType.startsWith("audio/")) return "audio";
   if (mimeType === "application/pdf") return "pdf";
   const ext = getFileExtension(name);
+  if (
+    ext === "docx" ||
+    mimeType ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  )
+    return "docx";
   if (ext === "md" || ext === "mdx" || mimeType === "text/markdown")
     return "markdown";
   if (ext === "csv" || mimeType === "text/csv") return "csv";
