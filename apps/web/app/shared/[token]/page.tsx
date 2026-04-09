@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, use } from "react";
-import { Download, Lock, AlertCircle, FileText, Folder } from "lucide-react";
+import {
+  Download,
+  Lock,
+  AlertCircle,
+  Folder,
+  ChevronRight,
+} from "lucide-react";
 import { Logo } from "@/assets/logo";
 import { trpc } from "@/lib/trpc/client";
 import { formatBytes } from "@/lib/utils";
@@ -18,11 +24,21 @@ export default function SharedPage({
   const { token } = use(params);
   const [password, setPassword] = useState("");
   const [enteredPassword, setEnteredPassword] = useState<string | undefined>();
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
 
   const { data, isLoading } = trpc.shares.access.useQuery({
     token,
     password: enteredPassword,
   });
+
+  const browseQuery = trpc.shares.browseFolder.useQuery(
+    {
+      token,
+      folderId: currentFolderId!,
+      password: enteredPassword,
+    },
+    { enabled: !!currentFolderId },
+  );
 
   const getDownloadUrl = trpc.shares.getDownloadUrl.useMutation();
 
@@ -40,6 +56,14 @@ export default function SharedPage({
     } catch (err) {
       toast.error((err as Error).message);
     }
+  };
+
+  const navigateToFolder = (folderId: string) => {
+    setCurrentFolderId(folderId);
+  };
+
+  const navigateToRoot = () => {
+    setCurrentFolderId(null);
   };
 
   if (isLoading) {
@@ -115,13 +139,26 @@ export default function SharedPage({
 
   const { item, access } = data;
 
+  // Determine what to display: browsed subfolder or root
+  const isBrowsing = currentFolderId !== null;
+  const browseData =
+    isBrowsing && browseQuery.data && !("error" in browseQuery.data)
+      ? browseQuery.data
+      : null;
+
+  const displayFiles = isBrowsing ? browseData?.files : item.files;
+  const displaySubfolders = isBrowsing
+    ? browseData?.subfolders
+    : item.subfolders;
+  const breadcrumbs = browseData?.breadcrumbs ?? [];
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md rounded-lg border bg-card p-6">
         <div className="flex items-center gap-2 mb-6">
           <Logo className="size-5 text-primary" />
           <span className="title text-base">Locker</span>
-          <span className="text-xs font-medium text-muted-foreground px-1.5 py-0.5 bg-primary/5 text-primary rounded-sm ml-auto">
+          <span className="text-xs font-medium px-1.5 py-0.5 bg-primary/5 text-primary rounded-sm ml-auto">
             Shared
           </span>
         </div>
@@ -153,44 +190,98 @@ export default function SharedPage({
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Folder className="size-5 text-primary" />
-              <h2 className="title text-base">{item.name}</h2>
-            </div>
+            {/* Breadcrumb navigation */}
+            <div className="flex items-center gap-1 flex-wrap">
+              <button
+                onClick={navigateToRoot}
+                className="flex items-center gap-1 text-sm hover:text-primary cursor-pointer"
+              >
+                <Folder className="size-4 text-primary shrink-0" />
+                <span className={isBrowsing ? "text-muted-foreground" : "font-medium text-foreground"}>
+                  {item.name}
+                </span>
+              </button>
 
-            <div className="border rounded-sm divide-y">
-              {item.files?.map((file) => (
-                <div
-                  key={file.id}
-                  className="flex items-center gap-2.5 px-3 py-2"
-                >
-                  <FileIcon
-                    name={file.name}
-                    mimeType={file.mimeType}
-                    className="h-4 w-4 shrink-0"
-                  />
-                  <span className="text-sm text-foreground truncate flex-1">
-                    {file.name}
-                  </span>
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {formatBytes(file.size)}
-                  </span>
-                  {access === "download" && (
-                    <button
-                      onClick={() => handleDownload(file.id)}
-                      className="text-primary hover:text-primary/80 cursor-pointer"
-                    >
-                      <Download className="size-3.5" />
-                    </button>
-                  )}
+              {breadcrumbs.map((crumb) => (
+                <div key={crumb.id} className="flex items-center gap-1">
+                  <ChevronRight className="size-3 text-muted-foreground shrink-0" />
+                  <button
+                    onClick={() => navigateToFolder(crumb.id)}
+                    className="text-sm text-muted-foreground hover:text-primary cursor-pointer"
+                  >
+                    {crumb.name}
+                  </button>
                 </div>
               ))}
-              {(!item.files || item.files.length === 0) && (
-                <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                  This folder is empty
-                </div>
-              )}
             </div>
+
+            {browseQuery.isLoading && isBrowsing ? (
+              <div className="border rounded-sm p-6 text-center">
+                <div className="skeleton h-4 w-24 mx-auto rounded-sm" />
+              </div>
+            ) : isBrowsing && (browseQuery.isError || (browseQuery.data && "error" in browseQuery.data)) ? (
+              <div className="border rounded-sm p-6 text-center">
+                <AlertCircle className="h-5 w-5 text-red-400 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  {browseQuery.data && "error" in browseQuery.data
+                    ? browseQuery.data.error
+                    : "Failed to load folder"}
+                </p>
+              </div>
+            ) : (
+              <div className="border rounded-sm divide-y">
+                {/* Subfolders */}
+                {displaySubfolders?.map((subfolder) => (
+                  <button
+                    key={subfolder.id}
+                    onClick={() => navigateToFolder(subfolder.id)}
+                    className="flex items-center gap-2.5 px-3 py-2 w-full text-left hover:bg-accent/50 cursor-pointer"
+                  >
+                    <Folder className="size-4 text-primary shrink-0" />
+                    <span className="text-sm font-medium text-foreground truncate flex-1">
+                      {subfolder.name}
+                    </span>
+                    <ChevronRight className="size-3.5 text-muted-foreground shrink-0" />
+                  </button>
+                ))}
+
+                {/* Files */}
+                {displayFiles?.map((file) => (
+                  <div
+                    key={file.id}
+                    className="flex items-center gap-2.5 px-3 py-2"
+                  >
+                    <FileIcon
+                      name={file.name}
+                      mimeType={file.mimeType}
+                      className="h-4 w-4 shrink-0"
+                    />
+                    <span className="text-sm text-foreground truncate flex-1">
+                      {file.name}
+                    </span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {formatBytes(file.size)}
+                    </span>
+                    {access === "download" && (
+                      <button
+                        onClick={() => handleDownload(file.id)}
+                        className="text-primary hover:text-primary/80 cursor-pointer"
+                      >
+                        <Download className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                {/* Empty state */}
+                {(!displayFiles || displayFiles.length === 0) &&
+                  (!displaySubfolders || displaySubfolders.length === 0) && (
+                    <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                      This folder is empty
+                    </div>
+                  )}
+              </div>
+            )}
           </div>
         )}
       </div>

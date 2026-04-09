@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, sql, desc, count } from "drizzle-orm";
+import { eq, and, sql, desc, count, asc } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { createRouter, workspaceProcedure, publicProcedure } from "../init";
 import {
@@ -15,6 +15,7 @@ import {
 import { TRACKED_LINK_TOKEN_LENGTH } from "@locker/common";
 import { createStorageForFile } from "../../../server/storage";
 import { hashLinkPassword, verifyLinkPassword } from "../../security/password";
+import { isDescendantFolder, buildBreadcrumbs } from "./shares";
 
 function generateToken(): string {
   return randomBytes(TRACKED_LINK_TOKEN_LENGTH).toString("hex");
@@ -458,6 +459,7 @@ export const trackedLinksRouter = createRouter({
         size?: number;
         mimeType?: string;
         files?: { id: string; name: string; size: number; mimeType: string }[];
+        subfolders?: { id: string; name: string }[];
       } | null = null;
 
       if (link.fileId) {
@@ -487,12 +489,18 @@ export const trackedLinksRouter = createRouter({
           })
           .from(files)
           .where(eq(files.folderId, link.folderId));
+        const subfolders = await ctx.db
+          .select({ id: folders.id, name: folders.name })
+          .from(folders)
+          .where(eq(folders.parentId, link.folderId))
+          .orderBy(asc(folders.name));
 
         if (folder) {
           sharedItem = {
             type: "folder",
             name: folder.name,
             files: folderFiles,
+            subfolders,
           };
         }
       }
@@ -511,6 +519,91 @@ export const trackedLinksRouter = createRouter({
         access: link.access,
         linkId: link.id,
         linkName: link.name,
+      };
+    }),
+
+  // Public: browse into a subfolder of a shared folder
+  browseFolder: publicProcedure
+    .input(
+      z.object({
+        token: z.string(),
+        folderId: z.string().uuid(),
+        password: z.string().optional(),
+        email: z.string().email().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const [link] = await ctx.db
+        .select()
+        .from(trackedLinks)
+        .where(eq(trackedLinks.token, input.token));
+
+      if (!link || !link.isActive || !link.folderId) {
+        return { error: "Link not found or has been deactivated" };
+      }
+
+      const now = new Date();
+      if (link.expiresAt && new Date(link.expiresAt) < now) {
+        return { error: "This link has expired" };
+      }
+      if (link.validFrom && new Date(link.validFrom) > now) {
+        return { error: "This link is not yet active" };
+      }
+      if (link.validUntil && new Date(link.validUntil) < now) {
+        return { error: "This link is no longer valid" };
+      }
+      if (link.hasPassword) {
+        if (!input.password) return { requiresPassword: true };
+        if (!verifyLinkPassword(input.password, link.passwordHash)) {
+          return { error: "Incorrect password" };
+        }
+      }
+      if (link.requireEmail && !input.email) {
+        return { requiresEmail: true };
+      }
+
+      const isDescendant = await isDescendantFolder(
+        ctx.db,
+        input.folderId,
+        link.folderId,
+      );
+      if (!isDescendant) {
+        return { error: "Folder not found" };
+      }
+
+      const [folder] = await ctx.db
+        .select({ id: folders.id, name: folders.name, parentId: folders.parentId })
+        .from(folders)
+        .where(eq(folders.id, input.folderId));
+
+      if (!folder) {
+        return { error: "Folder not found" };
+      }
+
+      const folderFiles = await ctx.db
+        .select({
+          id: files.id,
+          name: files.name,
+          size: files.size,
+          mimeType: files.mimeType,
+        })
+        .from(files)
+        .where(eq(files.folderId, input.folderId));
+
+      const subfolders = await ctx.db
+        .select({ id: folders.id, name: folders.name })
+        .from(folders)
+        .where(eq(folders.parentId, input.folderId))
+        .orderBy(asc(folders.name));
+
+      const breadcrumbs = await buildBreadcrumbs(ctx.db, input.folderId, link.folderId);
+
+      return {
+        folder: { id: folder.id, name: folder.name },
+        files: folderFiles,
+        subfolders,
+        breadcrumbs,
+        access: link.access,
       };
     }),
 
@@ -553,29 +646,41 @@ export const trackedLinksRouter = createRouter({
         throw new Error("Incorrect password");
       }
 
-      const queryConditions = [
-        eq(files.workspaceId, link.workspaceId),
-        eq(files.status, "ready"),
-      ];
-
+      let fileId: string;
       if (link.fileId) {
         if (input.fileId && input.fileId !== link.fileId) {
           throw new Error("File not found");
         }
-        queryConditions.push(eq(files.id, link.fileId));
+        fileId = link.fileId;
       } else if (link.folderId) {
         if (!input.fileId) throw new Error("No file specified");
-        queryConditions.push(eq(files.id, input.fileId));
-        queryConditions.push(eq(files.folderId, link.folderId));
+        fileId = input.fileId;
       } else {
         throw new Error("Link target not found");
       }
 
-      const [file] = await ctx.db
+      const [targetFile] = await ctx.db
         .select()
         .from(files)
-        .where(and(...queryConditions));
-      if (!file) throw new Error("File not found");
+        .where(
+          and(
+            eq(files.id, fileId),
+            eq(files.workspaceId, link.workspaceId),
+            eq(files.status, "ready"),
+          ),
+        );
+      if (!targetFile) throw new Error("File not found");
+
+      // For folder shares, verify the file lives inside the shared folder tree
+      if (link.folderId) {
+        if (!targetFile.folderId) throw new Error("File not found");
+        const allowed = await isDescendantFolder(
+          ctx.db,
+          targetFile.folderId,
+          link.folderId,
+        );
+        if (!allowed) throw new Error("File not found");
+      }
 
       // Increment download count
       await ctx.db
@@ -585,8 +690,8 @@ export const trackedLinksRouter = createRouter({
         })
         .where(eq(trackedLinks.id, link.id));
 
-      const storage = await createStorageForFile(file.storageConfigId);
-      const url = await storage.getSignedUrl(file.storagePath, 3600);
-      return { url, filename: file.name };
+      const storage = await createStorageForFile(targetFile.storageConfigId);
+      const url = await storage.getSignedUrl(targetFile.storagePath, 3600);
+      return { url, filename: targetFile.name };
     }),
 });
