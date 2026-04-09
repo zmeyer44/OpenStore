@@ -15,6 +15,8 @@ export interface PluginStorage {
     fileName: string;
     data: Buffer | ReadableStream;
     contentType: string;
+    /** Size in bytes. Required for accurate quota tracking when data is a ReadableStream. */
+    size?: number;
     /** Optional subfolder within the plugin folder, e.g. "images". */
     subPath?: string;
   }): Promise<{ fileId: string; storagePath: string }>;
@@ -53,7 +55,13 @@ interface FolderIds {
   pluginFolderId: string;
 }
 
-const folderCache = new Map<string, Promise<FolderIds>>();
+interface CacheEntry {
+  promise: Promise<FolderIds>;
+  expiresAt: number;
+}
+
+const CACHE_TTL_MS = 60_000; // 60 seconds
+const folderCache = new Map<string, CacheEntry>();
 
 async function ensurePluginFolder(
   db: Database,
@@ -63,7 +71,7 @@ async function ensurePluginFolder(
 ): Promise<FolderIds> {
   const cacheKey = `${workspaceId}:${pluginSlug}`;
   const cached = folderCache.get(cacheKey);
-  if (cached) return cached;
+  if (cached && cached.expiresAt > Date.now()) return cached.promise;
 
   const promise = (async (): Promise<FolderIds> => {
     // Ensure .plugins root folder
@@ -122,8 +130,11 @@ async function ensurePluginFolder(
     };
   })();
 
-  // Cache the promise but evict on failure
-  folderCache.set(cacheKey, promise);
+  // Cache with TTL; evict on failure
+  folderCache.set(cacheKey, {
+    promise,
+    expiresAt: Date.now() + CACHE_TTL_MS,
+  });
   promise.catch(() => folderCache.delete(cacheKey));
 
   return promise;
@@ -208,16 +219,16 @@ export function createPluginStorage(params: {
       // Upload to storage backend
       await storage.upload({
         path: storagePath,
-        data:
-          uploadParams.data instanceof Buffer
-            ? uploadParams.data
-            : uploadParams.data,
+        data: uploadParams.data,
         contentType: uploadParams.contentType,
       });
 
       // Compute size for DB entry
       const size =
-        uploadParams.data instanceof Buffer ? uploadParams.data.byteLength : 0;
+        uploadParams.size ??
+        (uploadParams.data instanceof Buffer
+          ? uploadParams.data.byteLength
+          : 0);
 
       // Create file record
       await db.insert(files).values({

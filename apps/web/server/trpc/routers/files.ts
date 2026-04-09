@@ -136,7 +136,7 @@ export const filesRouter = createRouter({
         } else {
           conditions.push(nameMatch);
         }
-        // Exclude files inside hidden system folders (e.g. .plugins)
+        // Exclude files inside hidden system folders (e.g. .plugins) at any depth
         const hiddenRoots = await db
           .select({ id: folders.id })
           .from(folders)
@@ -147,12 +147,18 @@ export const filesRouter = createRouter({
             ),
           );
         if (hiddenRoots.length > 0) {
-          const rootIds = hiddenRoots.map((f) => f.id);
-          const children = await db
-            .select({ id: folders.id })
-            .from(folders)
-            .where(inArray(folders.parentId, rootIds));
-          const allHiddenIds = [...rootIds, ...children.map((f) => f.id)];
+          const allHiddenIds = hiddenRoots.map((f) => f.id);
+          let frontier = [...allHiddenIds];
+          while (frontier.length > 0) {
+            const children = await db
+              .select({ id: folders.id })
+              .from(folders)
+              .where(inArray(folders.parentId, frontier));
+            if (children.length === 0) break;
+            const childIds = children.map((f) => f.id);
+            allHiddenIds.push(...childIds);
+            frontier = childIds;
+          }
           conditions.push(
             or(isNull(files.folderId), not(inArray(files.folderId, allHiddenIds)))!,
           );
