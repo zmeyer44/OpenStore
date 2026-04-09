@@ -35,8 +35,6 @@ export function ChatPanel({
   const [selectedModel, setSelectedModel] = useState<ModelId>(
     AVAILABLE_MODELS[0].id,
   );
-  const [attachments, setAttachments] = useState<File[]>([]);
-
   const { data: conversations } = trpc.knowledgeBases.conversations.useQuery({
     knowledgeBaseId,
   });
@@ -126,7 +124,6 @@ export function ChatPanel({
     if (!inputValue.trim() || !conversationId) return;
     sendMessage({ text: inputValue });
     setInputValue("");
-    setAttachments([]);
   };
 
   // Auto-select first conversation or create one
@@ -241,8 +238,6 @@ export function ChatPanel({
             onSubmit={handleSend}
             model={selectedModel}
             onModelChange={setSelectedModel}
-            attachments={attachments}
-            onAttachmentsChange={setAttachments}
             disabled={!conversationId}
             isSending={isStreaming}
           />

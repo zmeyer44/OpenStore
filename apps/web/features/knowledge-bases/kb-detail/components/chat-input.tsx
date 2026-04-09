@@ -3,9 +3,7 @@
 import { useRef, useEffect, useState } from "react";
 import {
   ArrowUp,
-  Paperclip,
   Square,
-  X,
   ChevronDown,
   Sparkles,
 } from "lucide-react";
@@ -33,8 +31,6 @@ interface ChatInputProps {
   onSubmit: () => void;
   model: ModelId;
   onModelChange: (model: ModelId) => void;
-  attachments: File[];
-  onAttachmentsChange: (files: File[]) => void;
   disabled?: boolean;
   isSending?: boolean;
   placeholder?: string;
@@ -46,16 +42,13 @@ export function ChatInput({
   onSubmit,
   model,
   onModelChange,
-  attachments,
-  onAttachmentsChange,
   disabled = false,
   isSending = false,
   placeholder = "Ask a question about your knowledge base...",
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
-  const canSubmit = (value.trim().length > 0 || attachments.length > 0) && !disabled;
+  const canSubmit = value.trim().length > 0 && !disabled;
 
   useEffect(() => {
     if (!disabled) textareaRef.current?.focus();
@@ -84,55 +77,11 @@ export function ChatInput({
     }
   };
 
-  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const nextFiles = Array.from(e.target.files ?? []);
-    if (nextFiles.length === 0) return;
-    onAttachmentsChange([...attachments, ...nextFiles]);
-    e.target.value = "";
-  };
-
-  const removeAttachment = (index: number) => {
-    onAttachmentsChange(attachments.filter((_, i) => i !== index));
-  };
-
   const selectedModel = AVAILABLE_MODELS.find((m) => m.id === model) ?? AVAILABLE_MODELS[0];
 
   return (
     <div className="border-t bg-background px-4 py-3">
       <form onSubmit={handleSubmit} className="mx-auto max-w-3xl">
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={handleFilesSelected}
-        />
-
-        {/* Attachment pills */}
-        {attachments.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {attachments.map((file, index) => (
-              <div
-                key={`${file.name}-${file.size}-${index}`}
-                className="flex items-center gap-1.5 rounded-md border bg-muted px-2.5 py-1 text-xs text-foreground"
-              >
-                <Paperclip className="size-3 text-muted-foreground" />
-                <span className="max-w-[180px] truncate font-mono text-[11px]">
-                  {file.name}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removeAttachment(index)}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
-                  aria-label={`Remove ${file.name}`}
-                >
-                  <X className="size-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Main input container */}
         <div
           className={cn(
@@ -156,17 +105,6 @@ export function ChatInput({
             className="max-h-[200px] min-h-[32px] pt-1 flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
             style={{ boxShadow: "none" }}
           />
-
-          {/* Attach button */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={disabled}
-            className="mb-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-            title="Attach files"
-          >
-            <Paperclip className="size-4" />
-          </button>
 
           {/* Send / Stop button */}
           <div className="flex items-center gap-1 pb-0.5">

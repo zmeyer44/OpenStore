@@ -175,6 +175,11 @@ export function UploadDialog({
         toast.warning(`${successCount} uploaded, ${errorCount} failed`);
       } else if (successCount > 0) {
         toast.success("Upload complete");
+        // Auto-close dialog when all files uploaded successfully
+        setFiles([]);
+        setInitializedFor(null);
+        setSelectedTagIds(new Set());
+        onOpenChange(false);
       }
     }
   };

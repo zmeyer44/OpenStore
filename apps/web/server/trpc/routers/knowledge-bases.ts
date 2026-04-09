@@ -182,29 +182,28 @@ export const knowledgeBasesRouter = createRouter({
     .input(createKnowledgeBaseSchema)
     .mutation(async ({ ctx, input }) => {
       const tagIds = [...new Set(input.tagIds)];
-
-      // Verify all tags belong to workspace
-      const validTags = await ctx.db
-        .select({ id: tags.id, slug: tags.slug })
-        .from(tags)
-        .where(
-          and(
-            inArray(tags.id, tagIds),
-            eq(tags.workspaceId, ctx.workspaceId),
-          ),
-        );
-
-      if (validTags.length !== tagIds.length) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "One or more tags not found",
-        });
-      }
-
       const kbId = crypto.randomUUID();
       const wikiStoragePath = `${ctx.workspaceId}/.kb/${kbId}/wiki/`;
 
       const [kb] = await ctx.db.transaction(async (tx) => {
+        // Validate tags inside the transaction to prevent TOCTOU races
+        const validTags = await tx
+          .select({ id: tags.id })
+          .from(tags)
+          .where(
+            and(
+              inArray(tags.id, tagIds),
+              eq(tags.workspaceId, ctx.workspaceId),
+            ),
+          );
+
+        if (validTags.length !== tagIds.length) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "One or more tags not found",
+          });
+        }
+
         const [inserted] = await tx
           .insert(knowledgeBases)
           .values({
@@ -679,6 +678,7 @@ export const knowledgeBasesRouter = createRouter({
         workspaceId: ctx.workspaceId,
         userId: ctx.userId,
         pluginId: kb.id,
+        pluginSlug: "knowledge-base",
         config: {},
       });
 
@@ -792,6 +792,7 @@ export const knowledgeBasesRouter = createRouter({
         workspaceId: ctx.workspaceId,
         userId: ctx.userId,
         pluginId: kb.id,
+        pluginSlug: "knowledge-base",
         config: {},
       });
 
