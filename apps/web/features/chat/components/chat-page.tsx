@@ -29,10 +29,7 @@ import { EmptyState } from "./empty-state";
 
 export function ChatPage({ workspaceSlug }: { workspaceSlug: string }) {
   const utils = trpc.useUtils();
-  const [conversationId, setConversationId] = useQueryState(
-    "c",
-    parseAsString,
-  );
+  const [conversationId, setConversationId] = useQueryState("c", parseAsString);
   const [inputValue, setInputValue] = useState("");
   const [selectedModel, setSelectedModel] = useState<ModelId>(
     AVAILABLE_MODELS[0].id,
@@ -296,7 +293,7 @@ export function ChatPage({ workspaceSlug }: { workspaceSlug: string }) {
   }, [conversations, conversationId]);
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full w-full overflow-hidden">
       {/* Conversation sidebar — fixed width, outside resizable group */}
       {sidebarOpen && (
         <div className="w-65 shrink-0 overflow-hidden">
@@ -323,10 +320,7 @@ export function ChatPage({ workspaceSlug }: { workspaceSlug: string }) {
       <div className="flex-1 min-w-0 h-full">
         <ResizablePanelGroup orientation="horizontal">
           {/* Chat panel */}
-          <ResizablePanel
-            defaultSize={previewFileId ? 60 : 100}
-            minSize={40}
-          >
+          <ResizablePanel defaultSize={previewFileId ? 60 : 100} minSize={40}>
             <div className="flex h-full flex-col overflow-hidden">
               {/* Top bar */}
               <div className="flex h-12 items-center gap-2 px-3 border-b bg-background min-w-0">
