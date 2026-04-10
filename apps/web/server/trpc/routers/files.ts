@@ -15,7 +15,14 @@ import {
   like,
 } from "drizzle-orm";
 import { createRouter, workspaceProcedure } from "../init";
-import { files, workspaces, folders, fileTags, tags } from "@locker/database";
+import {
+  files,
+  workspaces,
+  folders,
+  fileTags,
+  tags,
+  fileTranscriptions,
+} from "@locker/database";
 import { createStorageForFile } from "../../../server/storage";
 import {
   renameFileSchema,
@@ -126,6 +133,32 @@ export const filesRouter = createRouter({
             );
             for (const r of ftsResults) contentFileIds.add(r.fileId);
           } catch {}
+        }
+
+        // Fallback: search file_transcriptions directly when no search plugins returned results
+        if (contentFileIds.size === 0) {
+          const words = search.split(/\s+/).filter((w) => w.length > 1);
+          if (words.length > 0) {
+            const transcriptionHits = await db
+              .select({ fileId: fileTranscriptions.fileId })
+              .from(fileTranscriptions)
+              .where(
+                and(
+                  eq(fileTranscriptions.workspaceId, ctx.workspaceId),
+                  eq(fileTranscriptions.status, "ready"),
+                  or(
+                    ...words.map((w) =>
+                      ilike(
+                        fileTranscriptions.content,
+                        `%${w.replace(/[%_\\]/g, "\\$&")}%`,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+              .limit(pageSize);
+            for (const hit of transcriptionHits) contentFileIds.add(hit.fileId);
+          }
         }
 
         const nameMatch = ilike(files.name, `%${search}%`);
@@ -352,6 +385,53 @@ export const filesRouter = createRouter({
             }
           }
         } catch {}
+      }
+
+      // Fallback: search file_transcriptions directly when no search plugins returned results
+      if (contentMap.size === 0) {
+        const words = query.split(/\s+/).filter((w) => w.length > 1);
+        if (words.length > 0) {
+          const transcriptionHits = await db
+            .select({
+              fileId: fileTranscriptions.fileId,
+              content: fileTranscriptions.content,
+            })
+            .from(fileTranscriptions)
+            .where(
+              and(
+                eq(fileTranscriptions.workspaceId, ctx.workspaceId),
+                eq(fileTranscriptions.status, "ready"),
+                or(
+                  ...words.map((w) =>
+                    ilike(
+                      fileTranscriptions.content,
+                      `%${w.replace(/[%_\\]/g, "\\$&")}%`,
+                    ),
+                  ),
+                ),
+              ),
+            )
+            .limit(20);
+
+          for (const hit of transcriptionHits) {
+            // Extract a snippet around the first matching word
+            const lowerContent = hit.content.toLowerCase();
+            let snippet: string | undefined;
+            for (const w of words) {
+              const idx = lowerContent.indexOf(w.toLowerCase());
+              if (idx !== -1) {
+                const start = Math.max(0, idx - 60);
+                const end = Math.min(hit.content.length, idx + w.length + 60);
+                snippet =
+                  (start > 0 ? "..." : "") +
+                  hit.content.slice(start, end).trim() +
+                  (end < hit.content.length ? "..." : "");
+                break;
+              }
+            }
+            contentMap.set(hit.fileId, { snippet, score: 1 });
+          }
+        }
       }
 
       const escapedQuery = query.replace(/[%_\\]/g, "\\$&");

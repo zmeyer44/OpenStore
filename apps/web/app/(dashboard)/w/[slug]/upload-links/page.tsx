@@ -5,6 +5,7 @@ import { Copy, Trash2, XCircle, Upload, Plus, Check } from 'lucide-react';
 import { trpc } from '@/lib/trpc/client';
 import { formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import {
@@ -17,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 
 export default function UploadLinksPage() {
-  const { data: links } = trpc.uploadLinks.list.useQuery();
+  const { data: links, isPending } = trpc.uploadLinks.list.useQuery();
   const utils = trpc.useUtils();
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState('');
@@ -70,7 +71,32 @@ export default function UploadLinksPage() {
       </header>
 
       <div className="p-6">
-        {!links || links.length === 0 ? (
+        {isPending ? (
+          <div className="rounded-lg border bg-card overflow-hidden">
+            <div className="grid grid-cols-[1fr_120px_100px_120px_100px] gap-4 px-4 py-2 border-b bg-muted/50">
+              <span className="text-xs font-medium text-muted-foreground">Name</span>
+              <span className="text-xs font-medium text-muted-foreground">Destination</span>
+              <span className="text-xs font-medium text-muted-foreground">Uploads</span>
+              <span className="text-xs font-medium text-muted-foreground">Created</span>
+              <span className="text-xs font-medium text-muted-foreground">Actions</span>
+            </div>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="grid grid-cols-[1fr_120px_100px_120px_100px] gap-4 px-4 py-2.5 border-b last:border-b-0 items-center"
+              >
+                <Skeleton className="h-4 rounded-md" style={{ width: `${30 + ((i * 19) % 45)}%` }} />
+                <Skeleton className="h-4 w-14 rounded-md" />
+                <Skeleton className="h-4 w-8 rounded-md" />
+                <Skeleton className="h-4 w-16 rounded-md" />
+                <div className="flex items-center gap-1">
+                  <Skeleton className="size-6 rounded-md" />
+                  <Skeleton className="size-6 rounded-md" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : !links || links.length === 0 ? (
           <div className="rounded-lg border bg-card flex flex-col items-center justify-center py-20 text-center">
             <Upload className="size-8 text-muted-foreground/50 mb-3" />
             <p className="text-sm text-muted-foreground">

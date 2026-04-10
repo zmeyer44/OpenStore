@@ -13,3 +13,4 @@ export * from "./file-transcriptions";
 export * from "./tags";
 export * from "./knowledge-bases";
 export * from "./notifications";
+export * from "./assistant";

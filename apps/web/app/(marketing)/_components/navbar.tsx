@@ -144,18 +144,17 @@ export function Navbar() {
                     <span className="text-sm font-medium leading-none">
                       GitHub
                     </span>
-                    {stars !== null && (
-                      <span
-                        className={cn(
-                          "text-xs leading-tight",
-                          hasScrolled
-                            ? "text-muted-foreground"
-                            : "text-primary-foreground/60",
-                        )}
-                      >
-                        {formatStars(stars)} stars
-                      </span>
-                    )}
+
+                    <span
+                      className={cn(
+                        "text-xs leading-tight",
+                        hasScrolled
+                          ? "text-muted-foreground"
+                          : "text-primary-foreground/60",
+                      )}
+                    >
+                      {formatStars(stars !== null ? stars : 0)} stars
+                    </span>
                   </div>
                 </a>
                 {session ? (

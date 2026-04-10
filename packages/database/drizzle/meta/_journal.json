@@ -113,6 +113,13 @@
       "when": 1775664473848,
       "tag": "0015_shiny_master_mold",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1775771204313,
+      "tag": "0016_fuzzy_black_cat",
+      "breakpoints": true
     }
   ]
 }
