@@ -18,12 +18,13 @@ import {
 import { trpc } from '@/lib/trpc/client';
 import { formatDate, getRelativeTime } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { FileIcon } from '@/components/file-icon';
 import { toast } from 'sonner';
 
 export default function TrackedLinksPage() {
   const pathname = usePathname();
-  const { data: links } = trpc.trackedLinks.list.useQuery();
+  const { data: links, isPending } = trpc.trackedLinks.list.useQuery();
   const utils = trpc.useUtils();
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -61,7 +62,37 @@ export default function TrackedLinksPage() {
       </header>
 
       <div className="p-6">
-        {!links || links.length === 0 ? (
+        {isPending ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="rounded-lg border bg-card overflow-hidden">
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <Skeleton className="h-4 rounded-md" style={{ width: `${30 + ((i * 19) % 30)}%` }} />
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="size-3.5 rounded-md" />
+                        <Skeleton className="h-3 w-28 rounded-md" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Skeleton className="size-6 rounded-md" />
+                      <Skeleton className="size-6 rounded-md" />
+                      <Skeleton className="size-6 rounded-md" />
+                      <Skeleton className="size-6 rounded-md" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-5 mt-3 pt-3 border-t">
+                    <Skeleton className="h-3 w-16 rounded-md" />
+                    <Skeleton className="h-3 w-16 rounded-md" />
+                    <Skeleton className="h-3 w-20 rounded-md" />
+                    <Skeleton className="h-3 w-24 rounded-md ml-auto" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : links.length === 0 ? (
           <div className="rounded-lg border bg-card flex flex-col items-center justify-center py-20 text-center">
             <BarChart3 className="size-8 text-muted-foreground/50 mb-3" />
             <p className="text-sm text-muted-foreground">
