@@ -159,18 +159,15 @@ export function Navbar() {
                 </a>
                 {session ? (
                   <Link href="/home">
-                    <Button size="sm" className="rounded-lg">
-                      Dashboard
-                    </Button>
+                    <Button className="rounded-lg h-[40px]">Dashboard</Button>
                   </Link>
                 ) : (
                   <>
                     <Link href="/login" className="hidden sm:block">
                       <Button
                         variant="ghost"
-                        size="sm"
                         className={cn(
-                          "rounded-lg",
+                          "rounded-lg h-[40px]",
                           !hasScrolled &&
                             "text-primary-foreground/80 hover:bg-white/10 hover:text-primary-foreground",
                         )}
@@ -179,7 +176,7 @@ export function Navbar() {
                       </Button>
                     </Link>
                     <Link href="/register">
-                      <Button size="sm" className="rounded-lg">
+                      <Button className="rounded-lg h-[40px]">
                         Get Started
                       </Button>
                     </Link>

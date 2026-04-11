@@ -11,8 +11,8 @@ export class LocalStorageAdapter implements StorageProvider {
   private baseDir: string;
   private resolvedBaseDir: string;
 
-  constructor() {
-    this.baseDir = process.env.LOCAL_BLOB_DIR ?? './local-blobs';
+  constructor(config?: { baseDir?: string }) {
+    this.baseDir = config?.baseDir ?? process.env.LOCAL_BLOB_DIR ?? './local-blobs';
     this.resolvedBaseDir = path.resolve(this.baseDir);
   }
 
@@ -105,5 +105,53 @@ export class LocalStorageAdapter implements StorageProvider {
     } catch {
       return false;
     }
+  }
+
+  async list(prefix: string): Promise<{
+    path: string;
+    size: number;
+    lastModified: Date;
+  }[]> {
+    const normalizedPrefix = prefix.replace(/^\/+|\/+$/g, '');
+    const rootDir = normalizedPrefix
+      ? this.resolvePath(normalizedPrefix)
+      : this.resolvedBaseDir;
+
+    const results: { path: string; size: number; lastModified: Date }[] = [];
+
+    const walk = async (currentDir: string) => {
+      let entries: import("node:fs").Dirent[];
+      try {
+        entries = (await fs.readdir(currentDir, {
+          withFileTypes: true,
+        })) as import("node:fs").Dirent[];
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
+        throw err;
+      }
+
+      for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name);
+        if (entry.isDirectory()) {
+          await walk(fullPath);
+          continue;
+        }
+
+        if (!entry.isFile()) continue;
+        const stat = await fs.stat(fullPath);
+        const relativePath = path
+          .relative(this.resolvedBaseDir, fullPath)
+          .split(path.sep)
+          .join('/');
+        results.push({
+          path: relativePath,
+          size: stat.size,
+          lastModified: stat.mtime,
+        });
+      }
+    };
+
+    await walk(rootDir);
+    return results.sort((left, right) => left.path.localeCompare(right.path));
   }
 }

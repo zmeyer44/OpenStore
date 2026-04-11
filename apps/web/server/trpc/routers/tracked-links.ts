@@ -13,7 +13,10 @@ import {
   updateTrackedLinkSchema,
 } from "@locker/common";
 import { TRACKED_LINK_TOKEN_LENGTH } from "@locker/common";
-import { createStorageForFile } from "../../../server/storage";
+import {
+  createStorageForFile,
+  getFileStoragePath,
+} from "../../../server/storage";
 import { hashLinkPassword, verifyLinkPassword } from "../../security/password";
 import { isDescendantFolder, buildBreadcrumbs } from "./shares";
 
@@ -690,8 +693,11 @@ export const trackedLinksRouter = createRouter({
         })
         .where(eq(trackedLinks.id, link.id));
 
-      const storage = await createStorageForFile(targetFile.storageConfigId);
-      const url = await storage.getSignedUrl(targetFile.storagePath, 3600);
+      const storage = await createStorageForFile(targetFile.id);
+      const url = await storage.getSignedUrl(
+        await getFileStoragePath(targetFile.id),
+        3600,
+      );
       return { url, filename: targetFile.name };
     }),
 });

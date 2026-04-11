@@ -19,7 +19,11 @@ import {
 } from "@locker/common";
 import { TRPCError } from "@trpc/server";
 import type { Database } from "@locker/database";
-import { createStorageForWorkspace, createStorageForFile } from "../../storage";
+import {
+  createStorageForWorkspace,
+  createStorageForFile,
+  getFileStoragePath,
+} from "../../storage";
 import { getHandler, buildPluginContext } from "../../plugins/runtime";
 import { ingestFileIntoKB } from "../../knowledge-base/auto-ingest";
 
@@ -644,8 +648,6 @@ export const knowledgeBasesRouter = createRouter({
               id: files.id,
               name: files.name,
               mimeType: files.mimeType,
-              storagePath: files.storagePath,
-              storageConfigId: files.storageConfigId,
             })
             .from(fileTags)
             .innerJoin(files, eq(fileTags.fileId, files.id))
@@ -694,10 +696,10 @@ export const knowledgeBasesRouter = createRouter({
               let fileContent: string;
 
               if (isTextIndexable(file.mimeType)) {
-                const storage = await createStorageForFile(
-                  file.storageConfigId,
+                const storage = await createStorageForFile(file.id);
+                const { data } = await storage.download(
+                  await getFileStoragePath(file.id),
                 );
-                const { data } = await storage.download(file.storagePath);
                 fileContent = await streamToString(data);
               } else {
                 const [transcription] = await ctx.db

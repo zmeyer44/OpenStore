@@ -2,8 +2,13 @@ import { eq, and, isNull, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { folders, files, workspaces } from "@locker/database";
 import type { Database } from "@locker/database";
-import type { StorageProvider } from "@locker/storage";
 import { invalidateWorkspaceVfsSnapshot } from "../vfs/locker-vfs";
+import { createStorageForFile, getFileStoragePath } from "../storage";
+import {
+  createPendingFileUpload,
+  markFileUploadReady,
+} from "../stores/file-records";
+import { deleteFileEverywhere } from "../stores/lifecycle";
 
 // ---------------------------------------------------------------------------
 // PluginStorage interface
@@ -176,15 +181,11 @@ async function ensureSubFolder(
 
 export function createPluginStorage(params: {
   db: Database;
-  storage: StorageProvider;
   workspaceId: string;
   userId: string;
   pluginSlug: string;
-  storageConfigId: string | null;
-  providerName: string;
 }): PluginStorage {
-  const { db, storage, workspaceId, userId, pluginSlug, storageConfigId, providerName } =
-    params;
+  const { db, workspaceId, userId, pluginSlug } = params;
 
   async function resolveFolderId(subPath?: string): Promise<string> {
     const { pluginFolderId } = await ensurePluginFolder(
@@ -213,15 +214,27 @@ export function createPluginStorage(params: {
   return {
     async upload(uploadParams) {
       const folderId = await resolveFolderId(uploadParams.subPath);
-      const fileId = crypto.randomUUID();
-      const storagePath = `${workspaceId}/${fileId}/${uploadParams.fileName}`;
+      const pending = await createPendingFileUpload({
+        db,
+        workspaceId,
+        userId,
+        folderId,
+        fileName: uploadParams.fileName,
+        mimeType: uploadParams.contentType,
+        size:
+          uploadParams.size ??
+          (uploadParams.data instanceof Buffer
+            ? uploadParams.data.byteLength
+            : 0),
+        status: "uploading",
+      });
 
-      // Upload to storage backend
-      await storage.upload({
-        path: storagePath,
+      await pending.storage.upload({
+        path: pending.storagePath,
         data: uploadParams.data,
         contentType: uploadParams.contentType,
       });
+      await markFileUploadReady({ db, fileId: pending.fileId });
 
       // Compute size for DB entry
       const size =
@@ -229,21 +242,6 @@ export function createPluginStorage(params: {
         (uploadParams.data instanceof Buffer
           ? uploadParams.data.byteLength
           : 0);
-
-      // Create file record
-      await db.insert(files).values({
-        id: fileId,
-        workspaceId,
-        userId,
-        folderId,
-        name: uploadParams.fileName,
-        mimeType: uploadParams.contentType,
-        size,
-        storagePath,
-        storageProvider: providerName,
-        storageConfigId,
-        status: "ready",
-      });
 
       // Update workspace storage usage
       if (size > 0) {
@@ -257,15 +255,12 @@ export function createPluginStorage(params: {
 
       invalidateWorkspaceVfsSnapshot(workspaceId);
 
-      return { fileId, storagePath };
+      return { fileId: pending.fileId, storagePath: pending.storagePath };
     },
 
     async download(fileId) {
       const [file] = await db
-        .select({
-          storagePath: files.storagePath,
-          storageConfigId: files.storageConfigId,
-        })
+        .select({ id: files.id })
         .from(files)
         .where(
           and(eq(files.id, fileId), eq(files.workspaceId, workspaceId)),
@@ -274,21 +269,21 @@ export function createPluginStorage(params: {
 
       if (!file) throw new Error("File not found");
 
-      return storage.download(file.storagePath);
+      const storage = await createStorageForFile(file.id);
+      return storage.download(await getFileStoragePath(file.id));
     },
 
     async getSignedUrl(fileId, expiresIn) {
       const [file] = await db
-        .select({ storagePath: files.storagePath })
+        .select({ id: files.id })
         .from(files)
-        .where(
-          and(eq(files.id, fileId), eq(files.workspaceId, workspaceId)),
-        )
+        .where(and(eq(files.id, fileId), eq(files.workspaceId, workspaceId)))
         .limit(1);
 
       if (!file) throw new Error("File not found");
 
-      return storage.getSignedUrl(file.storagePath, expiresIn);
+      const storage = await createStorageForFile(file.id);
+      return storage.getSignedUrl(await getFileStoragePath(file.id), expiresIn);
     },
 
     async delete(fileId) {
@@ -305,27 +300,12 @@ export function createPluginStorage(params: {
 
       if (!file) return;
 
-      // Delete from storage
-      try {
-        await storage.delete(file.storagePath);
-      } catch {
-        // Storage deletion is best-effort
-      }
-
-      // Delete DB record
-      await db.delete(files).where(eq(files.id, fileId));
-
-      // Decrement workspace storage usage
-      if (file.size > 0) {
-        await db
-          .update(workspaces)
-          .set({
-            storageUsed: sql`GREATEST(${workspaces.storageUsed} - ${file.size}, 0)`,
-          })
-          .where(eq(workspaces.id, workspaceId));
-      }
-
-      invalidateWorkspaceVfsSnapshot(workspaceId);
+      await deleteFileEverywhere({
+        db,
+        workspaceId,
+        fileId,
+        deletedByUserId: userId,
+      });
     },
 
     async listFiles(subPath) {
@@ -356,11 +336,10 @@ export function createPluginStorage(params: {
 
 export async function cleanupPluginStorage(params: {
   db: Database;
-  storage: StorageProvider;
   workspaceId: string;
   pluginSlug: string;
 }): Promise<void> {
-  const { db, storage, workspaceId, pluginSlug } = params;
+  const { db, workspaceId, pluginSlug } = params;
 
   // Find the .plugins root folder
   const [rootFolder] = await db
@@ -415,42 +394,17 @@ export async function cleanupPluginStorage(params: {
     .from(files)
     .where(inArray(files.folderId, allFolderIds));
 
-  // Delete files from storage (best-effort)
-  let totalSize = 0;
   for (const file of pluginFiles) {
-    totalSize += Number(file.size);
-    try {
-      await storage.delete(file.storagePath);
-    } catch {
-      // best-effort
-    }
-  }
-
-  // Delete file records
-  if (pluginFiles.length > 0) {
-    await db
-      .delete(files)
-      .where(
-        inArray(
-          files.id,
-          pluginFiles.map((f) => f.id),
-        ),
-      );
+    await deleteFileEverywhere({
+      db,
+      workspaceId,
+      fileId: file.id,
+    }).catch(() => {});
   }
 
   // Delete folder records (children first, then plugin folder)
   for (const folderId of allFolderIds.reverse()) {
     await db.delete(folders).where(eq(folders.id, folderId));
-  }
-
-  // Adjust workspace storage
-  if (totalSize > 0) {
-    await db
-      .update(workspaces)
-      .set({
-        storageUsed: sql`GREATEST(${workspaces.storageUsed} - ${totalSize}, 0)`,
-      })
-      .where(eq(workspaces.id, workspaceId));
   }
 
   // Evict cache

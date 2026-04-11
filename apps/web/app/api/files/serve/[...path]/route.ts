@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { verifyLocalFileSignature } from "@locker/storage";
-import { createStorageForFile } from "../../../../../server/storage";
+import { createStorageForFile, getFileStoragePath } from "../../../../../server/storage";
 import { getDb } from "@locker/database/client";
 import { files } from "@locker/database";
 import { eq } from "drizzle-orm";
@@ -37,20 +37,27 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     return new Response("Access denied", { status: 403 });
   }
 
-  // Look up file record to determine which storage config it uses
+  // Look up the file row so storage resolution can choose a readable location.
   const db = getDb();
   const [fileRecord] = await db
-    .select({ storageConfigId: files.storageConfigId })
+    .select({ id: files.id })
     .from(files)
     .where(eq(files.storagePath, objectPath))
     .limit(1);
 
-  const storage = await createStorageForFile(
-    fileRecord?.storageConfigId ?? null,
-  );
+  const storage = fileRecord
+    ? await createStorageForFile(fileRecord.id)
+    : null;
+  const resolvedPath = fileRecord
+    ? await getFileStoragePath(fileRecord.id)
+    : null;
 
   try {
-    const file = await storage.download(objectPath);
+    if (!storage || !resolvedPath) {
+      return new Response("File not found", { status: 404 });
+    }
+
+    const file = await storage.download(resolvedPath);
     return new Response(file.data, {
       status: 200,
       headers: {

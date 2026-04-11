@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { files } from "@locker/database";
-import { createStorageForFile } from "../../storage";
+import { createStorageForFile, getFileStoragePath } from "../../storage";
 import { getBuiltinPluginBySlug } from "../catalog";
 import { transcribeFile } from "../transcription";
 import { transcribeWithAI } from "../../ai/transcribe";
@@ -38,8 +38,6 @@ export const documentTranscriptionHandler: PluginHandler = {
       const [file] = await ctx.db
         .select({
           mimeType: files.mimeType,
-          storagePath: files.storagePath,
-          storageConfigId: files.storageConfigId,
         })
         .from(files)
         .where(
@@ -59,8 +57,6 @@ export const documentTranscriptionHandler: PluginHandler = {
         fileId: target.id,
         fileName: target.name,
         mimeType: file.mimeType,
-        storagePath: file.storagePath,
-        storageConfigId: file.storageConfigId,
       }).catch(() => {});
 
       return {
@@ -78,12 +74,11 @@ export const documentTranscriptionHandler: PluginHandler = {
       fileId: string;
       fileName: string;
       mimeType: string;
-      storagePath: string;
-      storageConfigId: string | null;
     },
   ): Promise<TranscriptionResult> {
-    const storage = await createStorageForFile(params.storageConfigId);
-    const { data } = await storage.download(params.storagePath);
+    const storage = await createStorageForFile(params.fileId);
+    const storagePath = await getFileStoragePath(params.fileId);
+    const { data } = await storage.download(storagePath);
     const buffer = await streamToBuffer(data);
     const model = (ctx.config.model as string) || undefined;
 

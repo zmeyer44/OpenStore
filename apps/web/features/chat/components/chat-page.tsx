@@ -61,14 +61,10 @@ export function ChatPage({ workspaceSlug }: { workspaceSlug: string }) {
 
   const deleteConversationMutation =
     trpc.assistant.deleteConversation.useMutation({
-      onSuccess: () => {
-        if (conversations.length > 1) {
-          const remaining = conversations.filter(
-            (c) => c.id !== conversationId,
-          );
+      onSuccess: (_data, { conversationId: deletedId }) => {
+        if (conversationId === deletedId) {
+          const remaining = conversations.filter((c) => c.id !== deletedId);
           setConversationId(remaining[0]?.id ?? null);
-        } else {
-          setConversationId(null);
         }
         utils.assistant.conversations.invalidate();
         toast.success("Conversation deleted");

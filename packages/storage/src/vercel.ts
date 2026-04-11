@@ -1,8 +1,8 @@
-import { put, del, head } from "@vercel/blob";
+import { put, del, head, list } from "@vercel/blob";
 import type { StorageProvider } from "./interface";
 
 export interface VercelBlobConfig {
-  token: string;
+  token?: string;
 }
 
 export class VercelBlobAdapter implements StorageProvider {
@@ -85,5 +85,34 @@ export class VercelBlobAdapter implements StorageProvider {
     } catch {
       return false;
     }
+  }
+
+  async list(prefix: string): Promise<{
+    path: string;
+    size: number;
+    lastModified: Date;
+  }[]> {
+    const results: { path: string; size: number; lastModified: Date }[] = [];
+    let cursor: string | undefined;
+
+    do {
+      const response = await list({
+        prefix,
+        cursor,
+        ...this.tokenOpts,
+      });
+
+      for (const blob of response.blobs) {
+        results.push({
+          path: blob.pathname,
+          size: blob.size,
+          lastModified: blob.uploadedAt,
+        });
+      }
+
+      cursor = response.hasMore ? response.cursor : undefined;
+    } while (cursor);
+
+    return results;
   }
 }

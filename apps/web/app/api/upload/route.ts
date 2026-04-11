@@ -2,27 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../server/auth";
 import { headers } from "next/headers";
 import { getDb } from "@locker/database/client";
-import { files, folders, workspaces, workspaceMembers } from "@locker/database";
 import {
-  createStorageForWorkspace,
+  fileBlobs,
+  files,
+  folders,
+  workspaces,
+  workspaceMembers,
+} from "@locker/database";
+import {
   createStorageForFile,
   shouldEnforceQuota,
-  shouldEnforceQuotaForConfig,
+  shouldEnforceQuotaForFile,
 } from "../../../server/storage";
 import { MAX_FILE_SIZE } from "@locker/common";
 import { eq, and, sql } from "drizzle-orm";
-import { randomUUID } from "crypto";
-import {
-  qmdClient,
-  streamToString,
-} from "../../../server/plugins/handlers/qmd-client";
-import { ftsClient } from "../../../server/plugins/handlers/fts-client";
-import { resolvePluginEndpoint } from "../../../server/plugins/resolve-endpoint";
 import { invalidateWorkspaceVfsSnapshot } from "../../../server/vfs/locker-vfs";
 import {
-  isTextIndexable,
-  transcribeFile,
-} from "../../../server/plugins/transcription";
+  createPendingFileUpload,
+  markFileUploadReady,
+} from "../../../server/stores/file-records";
+import { runFileReadyHooks } from "../../../server/stores/lifecycle";
 
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -90,10 +89,10 @@ export async function POST(req: NextRequest) {
   let existingUploadRecord:
     | {
         id: string;
+        blobId: string;
         size: number;
         storagePath: string;
         status: string;
-        storageConfigId: string | null;
       }
     | undefined;
 
@@ -101,10 +100,10 @@ export async function POST(req: NextRequest) {
     const [uploadRecord] = await db
       .select({
         id: files.id,
+        blobId: files.blobId,
         size: files.size,
         storagePath: files.storagePath,
         status: files.status,
-        storageConfigId: files.storageConfigId,
       })
       .from(files)
       .where(
@@ -135,10 +134,7 @@ export async function POST(req: NextRequest) {
   // Check storage quota based on where bytes will actually land:
   // resumed uploads use the file's config, fresh uploads use current workspace config.
   const enforceQuota = existingUploadRecord
-    ? await shouldEnforceQuotaForConfig(
-        workspaceId,
-        existingUploadRecord.storageConfigId,
-      )
+    ? await shouldEnforceQuotaForFile(existingUploadRecord.id)
     : await shouldEnforceQuota(workspaceId);
 
   if (enforceQuota) {
@@ -150,25 +146,29 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Resolve storage: for resumed uploads use the config recorded at initiate
-  // time; for fresh uploads use the current workspace config.
-  let storage: Awaited<ReturnType<typeof createStorageForFile>>;
-  let newConfigId: string | null = null;
-  let newProviderName: string | undefined;
+  let pendingUpload:
+    | Awaited<ReturnType<typeof createPendingFileUpload>>
+    | undefined;
 
-  if (existingUploadRecord) {
-    storage = await createStorageForFile(existingUploadRecord.storageConfigId);
-  } else {
-    const ws = await createStorageForWorkspace(workspaceId);
-    storage = ws.storage;
-    newConfigId = ws.configId;
-    newProviderName = ws.providerName;
-  }
+  const storage = existingUploadRecord
+    ? await createStorageForFile(existingUploadRecord.id)
+    : (
+        (pendingUpload = await createPendingFileUpload({
+          db,
+          workspaceId,
+          userId,
+          folderId: folderId || null,
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          size: file.size,
+          status: "uploading",
+        })),
+        pendingUpload.storage
+      );
 
-  const fileId = existingUploadRecord?.id ?? randomUUID();
+  const fileId = existingUploadRecord?.id ?? pendingUpload!.fileId;
   const storagePath =
-    existingUploadRecord?.storagePath ??
-    `${workspaceId}/${fileId}/${file.name}`;
+    existingUploadRecord?.storagePath ?? pendingUpload!.storagePath;
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -179,12 +179,11 @@ export async function POST(req: NextRequest) {
       contentType: file.type || "application/octet-stream",
     });
   } catch (err) {
-    // Clean up the file record if this was a fresh upload
-    if (!existingFileId) {
-      await db
-        .delete(files)
-        .where(eq(files.id, fileId))
-        .catch(() => {});
+    if (!existingFileId && pendingUpload) {
+      await db.transaction(async (tx) => {
+        await tx.delete(files).where(eq(files.id, fileId));
+        await tx.delete(fileBlobs).where(eq(fileBlobs.id, pendingUpload!.blobId));
+      }).catch(() => {});
     }
     return NextResponse.json(
       { error: `Storage upload failed: ${(err as Error).message}` },
@@ -193,16 +192,13 @@ export async function POST(req: NextRequest) {
   }
 
   let newFile: typeof files.$inferSelect | undefined;
-  if (existingFileId) {
-    // Update existing record created by uploads.initiate
-    [newFile] = await db
+  if (existingFileId && existingUploadRecord) {
+    await db
       .update(files)
       .set({
         name: file.name,
         mimeType: file.type || "application/octet-stream",
         size: file.size,
-        storagePath,
-        status: "ready",
         updatedAt: new Date(),
       })
       .where(
@@ -211,26 +207,41 @@ export async function POST(req: NextRequest) {
           eq(files.workspaceId, workspaceId),
           eq(files.status, "uploading"),
         ),
-      )
-      .returning();
+      );
+    await db
+      .update(fileBlobs)
+      .set({
+        byteSize: file.size,
+        mimeType: file.type || "application/octet-stream",
+        updatedAt: new Date(),
+      })
+      .where(eq(fileBlobs.id, existingUploadRecord.blobId));
   } else {
-    [newFile] = await db
-      .insert(files)
-      .values({
-        id: fileId,
-        workspaceId,
-        userId,
-        folderId: folderId || null,
+    await db
+      .update(files)
+      .set({
         name: file.name,
         mimeType: file.type || "application/octet-stream",
         size: file.size,
-        storagePath,
-        storageProvider: newProviderName!,
-        storageConfigId: newConfigId,
-        status: "ready",
+        updatedAt: new Date(),
       })
-      .returning();
+      .where(eq(files.id, fileId));
+    await db
+      .update(fileBlobs)
+      .set({
+        byteSize: file.size,
+        mimeType: file.type || "application/octet-stream",
+        updatedAt: new Date(),
+      })
+      .where(eq(fileBlobs.id, pendingUpload!.blobId));
   }
+
+  await markFileUploadReady({ db, fileId });
+  [newFile] = await db
+    .select()
+    .from(files)
+    .where(eq(files.id, fileId))
+    .limit(1);
 
   // Update workspace storage usage
   const billedSize = existingUploadRecord?.size ?? file.size;
@@ -239,98 +250,13 @@ export async function POST(req: NextRequest) {
     .set({ storageUsed: sql`${workspaces.storageUsed} + ${billedSize}` })
     .where(eq(workspaces.id, workspaceId));
 
-  // Fire-and-forget: index file for search plugins
   if (newFile) {
-    const uploadedFile = newFile;
-    void (async () => {
-      // Lazily fetch content only if at least one search plugin needs it
-      let content: string | undefined;
-
-      async function getContent(): Promise<string | undefined> {
-        if (content !== undefined) return content;
-        try {
-          const dl = await storage.download(uploadedFile.storagePath);
-          content = await streamToString(dl.data);
-        } catch {
-          content = undefined;
-        }
-        return content;
-      }
-
-      // QMD semantic search
-      if (qmdClient.shouldIndex(uploadedFile.mimeType)) {
-        try {
-          const qmdEndpoint = await resolvePluginEndpoint(
-            db,
-            workspaceId,
-            "qmd-search",
-            {
-              serviceUrl: process.env.QMD_SERVICE_URL,
-              apiSecret: process.env.QMD_API_SECRET,
-            },
-          );
-          if (qmdEndpoint) {
-            const text = await getContent();
-            if (text) {
-              await qmdClient.indexFile(
-                {
-                  workspaceId,
-                  fileId: uploadedFile.id,
-                  fileName: uploadedFile.name,
-                  mimeType: uploadedFile.mimeType,
-                  content: text,
-                },
-                qmdEndpoint,
-              );
-            }
-          }
-        } catch {}
-      }
-
-      // FTS5 full-text search
-      if (ftsClient.shouldIndex(uploadedFile.mimeType)) {
-        try {
-          const ftsEndpoint = await resolvePluginEndpoint(
-            db,
-            workspaceId,
-            "fts-search",
-            {
-              serviceUrl: process.env.FTS_SERVICE_URL,
-              apiSecret: process.env.FTS_API_SECRET,
-            },
-          );
-          if (ftsEndpoint) {
-            const text = await getContent();
-            if (text) {
-              await ftsClient.indexFile(
-                {
-                  workspaceId,
-                  fileId: uploadedFile.id,
-                  fileName: uploadedFile.name,
-                  mimeType: uploadedFile.mimeType,
-                  content: text,
-                },
-                ftsEndpoint,
-              );
-            }
-          }
-        } catch {}
-      }
-    })();
-
-    // Fire-and-forget: transcribe non-text files (images, PDFs, etc.)
-    if (!isTextIndexable(uploadedFile.mimeType)) {
-      void transcribeFile({
-        db,
-        workspaceId,
-        userId,
-        fileId: uploadedFile.id,
-        fileName: uploadedFile.name,
-        mimeType: uploadedFile.mimeType,
-        storagePath: uploadedFile.storagePath,
-        storageConfigId: uploadedFile.storageConfigId,
-      }).catch(() => {});
-    }
+    void runFileReadyHooks({
+      db,
+      workspaceId,
+      userId,
+      fileId: newFile.id,
+    }).catch(() => {});
   }
 
   invalidateWorkspaceVfsSnapshot(workspaceId);

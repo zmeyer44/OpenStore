@@ -4,6 +4,7 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   CreateMultipartUploadCommand,
   UploadPartCommand,
   CompleteMultipartUploadCommand,
@@ -11,12 +12,13 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl as awsGetSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { StorageProvider } from "./interface";
+import { Readable } from "node:stream";
 
 export interface S3StorageConfig {
-  accessKeyId: string;
-  secretAccessKey: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
   region?: string;
-  bucket: string;
+  bucket?: string;
   endpoint?: string;
 }
 
@@ -48,20 +50,9 @@ export class S3StorageAdapter implements StorageProvider {
     contentType: string;
     metadata?: Record<string, string>;
   }): Promise<{ url: string; path: string }> {
-    let body: Buffer;
-    if (Buffer.isBuffer(params.data)) {
-      body = params.data;
-    } else {
-      const reader = (params.data as ReadableStream).getReader();
-      const chunks: Uint8Array[] = [];
-      let done = false;
-      while (!done) {
-        const result = await reader.read();
-        done = result.done;
-        if (result.value) chunks.push(result.value);
-      }
-      body = Buffer.concat(chunks);
-    }
+    const body = Buffer.isBuffer(params.data)
+      ? params.data
+      : Readable.fromWeb(params.data as any);
 
     await this.client.send(
       new PutObjectCommand({
@@ -143,6 +134,40 @@ export class S3StorageAdapter implements StorageProvider {
     } catch {
       return false;
     }
+  }
+
+  async list(prefix: string): Promise<{
+    path: string;
+    size: number;
+    lastModified: Date;
+  }[]> {
+    const results: { path: string; size: number; lastModified: Date }[] = [];
+    let continuationToken: string | undefined;
+
+    do {
+      const response = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
+
+      for (const item of response.Contents ?? []) {
+        if (!item.Key) continue;
+        results.push({
+          path: item.Key,
+          size: item.Size ?? 0,
+          lastModified: item.LastModified ?? new Date(0),
+        });
+      }
+
+      continuationToken = response.IsTruncated
+        ? response.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
+
+    return results;
   }
 
   // ── Presigned upload (single PUT for small files) ─────────────────────

@@ -124,8 +124,6 @@ export async function transcribeFile(params: {
   fileId: string;
   fileName: string;
   mimeType: string;
-  storagePath: string;
-  storageConfigId: string | null;
 }): Promise<void> {
   const { db, workspaceId, userId, fileId, fileName, mimeType } = params;
 
@@ -166,8 +164,6 @@ export async function transcribeFile(params: {
       fileId,
       fileName,
       mimeType,
-      storagePath: params.storagePath,
-      storageConfigId: params.storageConfigId,
     });
 
     // Store the transcription content

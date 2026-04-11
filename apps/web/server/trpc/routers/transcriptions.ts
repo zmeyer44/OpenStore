@@ -89,8 +89,6 @@ export const transcriptionsRouter = createRouter({
           id: files.id,
           name: files.name,
           mimeType: files.mimeType,
-          storagePath: files.storagePath,
-          storageConfigId: files.storageConfigId,
         })
         .from(files)
         .where(
@@ -135,8 +133,6 @@ export const transcriptionsRouter = createRouter({
         fileId: file.id,
         fileName: file.name,
         mimeType: file.mimeType,
-        storagePath: file.storagePath,
-        storageConfigId: file.storageConfigId,
       }).catch(() => {});
 
       return { status: "queued" as const, message: "Transcription started" };

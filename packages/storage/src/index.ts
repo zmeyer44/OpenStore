@@ -48,14 +48,17 @@ export type StorageCredentials =
       accessKeyId: string;
       secretAccessKey: string;
     }
-  | { provider: "vercel"; readWriteToken: string };
+  | { provider: "vercel_blob"; readWriteToken: string };
 
 export interface WorkspaceStorageConfig {
-  provider: "s3" | "r2" | "vercel";
-  bucket: string;
+  provider: "s3" | "r2" | "vercel_blob" | "local";
+  bucket?: string | null;
   region?: string | null;
   endpoint?: string | null;
-  credentials: StorageCredentials;
+  accountId?: string | null;
+  publicUrl?: string | null;
+  baseDir?: string | null;
+  credentials?: StorageCredentials | null;
 }
 
 /**
@@ -66,26 +69,39 @@ export function createStorageFromConfig(
   config: WorkspaceStorageConfig,
 ): StorageProvider {
   const creds = config.credentials;
-  switch (creds.provider) {
+  switch (config.provider) {
     case "s3":
       return new S3StorageAdapter({
-        accessKeyId: creds.accessKeyId,
-        secretAccessKey: creds.secretAccessKey,
-        bucket: config.bucket,
+        accessKeyId:
+          creds && creds.provider === "s3" ? creds.accessKeyId : undefined,
+        secretAccessKey:
+          creds && creds.provider === "s3" ? creds.secretAccessKey : undefined,
+        bucket: config.bucket ?? undefined,
         region: config.region ?? undefined,
         endpoint: config.endpoint ?? undefined,
       });
     case "r2":
       return new R2StorageAdapter({
-        accountId: creds.accountId,
-        accessKeyId: creds.accessKeyId,
-        secretAccessKey: creds.secretAccessKey,
-        bucket: config.bucket,
-        publicUrl: undefined,
+        accountId:
+          config.accountId ??
+          (creds && creds.provider === "r2" ? creds.accountId : undefined),
+        accessKeyId:
+          creds && creds.provider === "r2" ? creds.accessKeyId : undefined,
+        secretAccessKey:
+          creds && creds.provider === "r2" ? creds.secretAccessKey : undefined,
+        bucket: config.bucket ?? undefined,
+        publicUrl: config.publicUrl ?? undefined,
       });
-    case "vercel":
+    case "vercel_blob":
       return new VercelBlobAdapter({
-        token: creds.readWriteToken,
+        token:
+          creds && creds.provider === "vercel_blob"
+            ? creds.readWriteToken
+            : undefined,
+      });
+    case "local":
+      return new LocalStorageAdapter({
+        baseDir: config.baseDir ?? undefined,
       });
     default:
       return createStorage();

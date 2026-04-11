@@ -30,6 +30,7 @@ e2e/.auth/
 
 # local blob storage
 local-blobs/
+TODO.md
 
 # claude code
 .claude/worktrees/
@@ -37,3 +38,5 @@ local-blobs/
 # misc
 *.log
 *.tsbuildinfo
+
+

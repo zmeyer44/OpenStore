@@ -134,10 +134,15 @@ export default function TrackedLinkPage({
         password: enteredPassword,
         email: enteredEmail,
       });
+      const response = await fetch(result.url);
+      if (!response.ok) throw new Error(`Download failed (${response.status})`);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = result.url;
+      a.href = blobUrl;
       a.download = result.filename;
       a.click();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
     } catch (err) {
       toast.error((err as Error).message);
     }

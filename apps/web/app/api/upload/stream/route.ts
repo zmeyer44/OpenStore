@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../server/auth";
 import { headers } from "next/headers";
 import { getDb } from "@locker/database/client";
-import { files, workspaces, workspaceMembers } from "@locker/database";
+import { fileBlobs, files, workspaces, workspaceMembers } from "@locker/database";
 import {
   createStorageForFile,
-  shouldEnforceQuotaForConfig,
+  shouldEnforceQuotaForFile,
 } from "../../../../server/storage";
 import { eq, and, sql } from "drizzle-orm";
 import { invalidateWorkspaceVfsSnapshot } from "../../../../server/vfs/locker-vfs";
+import { markFileUploadReady } from "../../../../server/stores/file-records";
+import { runFileReadyHooks } from "../../../../server/stores/lifecycle";
 
 export const runtime = "nodejs";
 
@@ -96,12 +98,7 @@ export async function PUT(req: NextRequest) {
 
   // Enforce quota based on where bytes actually land (the file's config),
   // not the workspace's current config which may have changed since initiate.
-  if (
-    await shouldEnforceQuotaForConfig(
-      membership.workspaceId,
-      fileRecord.storageConfigId,
-    )
-  ) {
+  if (await shouldEnforceQuotaForFile(fileRecord.id)) {
     if (
       (membership.storageUsed ?? 0) + contentLength >
       (membership.storageLimit ?? 0)
@@ -114,8 +111,7 @@ export async function PUT(req: NextRequest) {
   }
 
   // Stream the request body to storage
-  // Use the config that was recorded when the upload was initiated
-  const storage = await createStorageForFile(fileRecord.storageConfigId);
+  const storage = await createStorageForFile(fileRecord.id);
 
   try {
     await storage.upload({
@@ -125,10 +121,7 @@ export async function PUT(req: NextRequest) {
     });
 
     // Mark file as ready
-    await db
-      .update(files)
-      .set({ status: "ready", updatedAt: new Date() })
-      .where(eq(files.id, fileId));
+    await markFileUploadReady({ db, fileId });
 
     // Update storage usage
     await db
@@ -137,6 +130,13 @@ export async function PUT(req: NextRequest) {
         storageUsed: sql`${workspaces.storageUsed} + ${contentLength}`,
       })
       .where(eq(workspaces.id, membership.workspaceId));
+
+    void runFileReadyHooks({
+      db,
+      workspaceId: membership.workspaceId,
+      userId,
+      fileId,
+    }).catch(() => {});
 
     invalidateWorkspaceVfsSnapshot(membership.workspaceId);
     return NextResponse.json({ success: true, fileId });
@@ -147,7 +147,10 @@ export async function PUT(req: NextRequest) {
     } catch {
       // best effort
     }
-    await db.delete(files).where(eq(files.id, fileId));
+    await db.transaction(async (tx) => {
+      await tx.delete(files).where(eq(files.id, fileId));
+      await tx.delete(fileBlobs).where(eq(fileBlobs.id, fileRecord.blobId));
+    });
     invalidateWorkspaceVfsSnapshot(membership.workspaceId);
 
     return NextResponse.json(

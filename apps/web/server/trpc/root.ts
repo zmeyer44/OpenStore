@@ -13,6 +13,7 @@ import { pluginsRouter } from "./routers/plugins";
 import { transcriptionsRouter } from "./routers/transcriptions";
 import { vfsShellRouter } from "./routers/vfs-shell";
 import { storageConfigRouter } from "./routers/storage-config";
+import { storesRouter } from "./routers/stores";
 import { tagsRouter } from "./routers/tags";
 import { knowledgeBasesRouter } from "./routers/knowledge-bases";
 import { usersRouter } from "./routers/users";
@@ -26,6 +27,7 @@ export const appRouter = createRouter({
   uploadLinks: uploadLinksRouter,
   storage: storageRouter,
   storageConfig: storageConfigRouter,
+  stores: storesRouter,
   workspaces: workspacesRouter,
   members: membersRouter,
   uploads: uploadsRouter,

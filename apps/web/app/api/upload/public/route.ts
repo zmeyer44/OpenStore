@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@locker/database/client";
-import { files, uploadLinks, workspaces } from "@locker/database";
-import {
-  createStorageForWorkspace,
-  shouldEnforceQuota,
-} from "../../../../server/storage";
+import { blobLocations, fileBlobs, files, uploadLinks, workspaces } from "@locker/database";
+import { shouldEnforceQuota } from "../../../../server/storage";
 import { eq, sql } from "drizzle-orm";
-import { randomUUID } from "crypto";
 import { verifyLinkPassword } from "@/server/security/password";
+import {
+  createPendingFileUpload,
+  markFileUploadReady,
+} from "../../../../server/stores/file-records";
+import { runFileReadyHooks } from "../../../../server/stores/lifecycle";
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -86,33 +87,38 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { storage, configId, providerName } = await createStorageForWorkspace(
-    link.workspaceId,
-  );
-  const fileId = randomUUID();
-  const storagePath = `${link.workspaceId}/${fileId}/${file.name}`;
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-
-  await storage.upload({
-    path: storagePath,
-    data: buffer,
-    contentType: file.type || "application/octet-stream",
-  });
-
-  await db.insert(files).values({
-    id: fileId,
+  const pending = await createPendingFileUpload({
+    db,
     workspaceId: link.workspaceId,
     userId: link.userId,
     folderId: link.folderId ?? null,
-    name: file.name,
+    fileName: file.name,
     mimeType: file.type || "application/octet-stream",
     size: file.size,
-    storagePath,
-    storageProvider: providerName,
-    storageConfigId: configId,
-    status: "ready",
+    status: "uploading",
   });
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  try {
+    await pending.storage.upload({
+      path: pending.storagePath,
+      data: buffer,
+      contentType: file.type || "application/octet-stream",
+    });
+  } catch (err) {
+    await db.transaction(async (tx) => {
+      await tx.delete(blobLocations).where(eq(blobLocations.blobId, pending.blobId));
+      await tx.delete(files).where(eq(files.id, pending.fileId));
+      await tx.delete(fileBlobs).where(eq(fileBlobs.id, pending.blobId));
+    }).catch(() => {});
+    return NextResponse.json(
+      { error: `Upload failed: ${(err as Error).message}` },
+      { status: 502 },
+    );
+  }
+
+  await markFileUploadReady({ db, fileId: pending.fileId });
 
   // Update counts
   await db
@@ -124,6 +130,13 @@ export async function POST(req: NextRequest) {
     .update(workspaces)
     .set({ storageUsed: sql`${workspaces.storageUsed} + ${file.size}` })
     .where(eq(workspaces.id, link.workspaceId));
+
+  void runFileReadyHooks({
+    db,
+    workspaceId: link.workspaceId,
+    userId: link.userId,
+    fileId: pending.fileId,
+  }).catch(() => {});
 
   return NextResponse.json({ success: true });
 }

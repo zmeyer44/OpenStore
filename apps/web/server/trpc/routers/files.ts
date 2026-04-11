@@ -23,7 +23,10 @@ import {
   tags,
   fileTranscriptions,
 } from "@locker/database";
-import { createStorageForFile } from "../../../server/storage";
+import {
+  createStorageForFile,
+  getFileStoragePath,
+} from "../../../server/storage";
 import {
   renameFileSchema,
   moveItemSchema,
@@ -40,6 +43,7 @@ import { qmdClient } from "../../plugins/handlers/qmd-client";
 import { ftsClient } from "../../plugins/handlers/fts-client";
 import { resolvePluginEndpoint } from "../../plugins/resolve-endpoint";
 import { invalidateWorkspaceVfsSnapshot } from "../../vfs/locker-vfs";
+import { deleteFileEverywhere } from "../../stores/lifecycle";
 
 export const filesRouter = createRouter({
   list: workspaceProcedure
@@ -508,8 +512,11 @@ export const filesRouter = createRouter({
 
       if (!file) throw new Error("File not found");
 
-      const storage = await createStorageForFile(file.storageConfigId);
-      const url = await storage.getSignedUrl(file.storagePath, 3600);
+      const storage = await createStorageForFile(file.id);
+      const url = await storage.getSignedUrl(
+        await getFileStoragePath(file.id),
+        3600,
+      );
       return { url, filename: file.name, mimeType: file.mimeType };
     }),
 
@@ -569,86 +576,18 @@ export const filesRouter = createRouter({
 
       if (!file) throw new Error("File not found");
 
-      // Delete from storage
-      const storage = await createStorageForFile(file.storageConfigId);
-      await storage.delete(file.storagePath);
-
-      // De-index from search plugins
-      const qmdEndpoint = await resolvePluginEndpoint(
-        ctx.db,
-        ctx.workspaceId,
-        "qmd-search",
-        {
-          serviceUrl: process.env.QMD_SERVICE_URL,
-          apiSecret: process.env.QMD_API_SECRET,
-        },
-      );
-      if (qmdEndpoint) {
-        void qmdClient
-          .deindexFile(
-            { workspaceId: ctx.workspaceId, fileId: file.id },
-            qmdEndpoint,
-          )
-          .catch(() => {});
-      }
-
-      const ftsEndpoint = await resolvePluginEndpoint(
-        ctx.db,
-        ctx.workspaceId,
-        "fts-search",
-        {
-          serviceUrl: process.env.FTS_SERVICE_URL,
-          apiSecret: process.env.FTS_API_SECRET,
-        },
-      );
-      if (ftsEndpoint) {
-        void ftsClient
-          .deindexFile(
-            { workspaceId: ctx.workspaceId, fileId: file.id },
-            ftsEndpoint,
-          )
-          .catch(() => {});
-      }
-
-      // Delete from database
-      await ctx.db.delete(files).where(eq(files.id, input.id));
-
-      // Update storage usage
-      await ctx.db
-        .update(workspaces)
-        .set({
-          storageUsed: sql`GREATEST(${workspaces.storageUsed} - ${file.size}, 0)`,
-        })
-        .where(eq(workspaces.id, ctx.workspaceId));
-
-      invalidateWorkspaceVfsSnapshot(ctx.workspaceId);
+      await deleteFileEverywhere({
+        db: ctx.db,
+        workspaceId: ctx.workspaceId,
+        fileId: input.id,
+        deletedByUserId: ctx.userId,
+      });
       return { success: true };
     }),
 
   deleteMany: workspaceProcedure
     .input(z.object({ ids: z.array(z.string().uuid()) }))
     .mutation(async ({ ctx, input }) => {
-      let totalSize = 0;
-
-      const qmdEndpoint = await resolvePluginEndpoint(
-        ctx.db,
-        ctx.workspaceId,
-        "qmd-search",
-        {
-          serviceUrl: process.env.QMD_SERVICE_URL,
-          apiSecret: process.env.QMD_API_SECRET,
-        },
-      );
-      const ftsEndpoint = await resolvePluginEndpoint(
-        ctx.db,
-        ctx.workspaceId,
-        "fts-search",
-        {
-          serviceUrl: process.env.FTS_SERVICE_URL,
-          apiSecret: process.env.FTS_API_SECRET,
-        },
-      );
-
       for (const id of input.ids) {
         const [file] = await ctx.db
           .select()
@@ -656,39 +595,14 @@ export const filesRouter = createRouter({
           .where(and(eq(files.id, id), eq(files.workspaceId, ctx.workspaceId)));
 
         if (file) {
-          const storage = await createStorageForFile(file.storageConfigId);
-          await storage.delete(file.storagePath);
-          if (qmdEndpoint) {
-            void qmdClient
-              .deindexFile(
-                { workspaceId: ctx.workspaceId, fileId: file.id },
-                qmdEndpoint,
-              )
-              .catch(() => {});
-          }
-          if (ftsEndpoint) {
-            void ftsClient
-              .deindexFile(
-                { workspaceId: ctx.workspaceId, fileId: file.id },
-                ftsEndpoint,
-              )
-              .catch(() => {});
-          }
-          await ctx.db.delete(files).where(eq(files.id, id));
-          totalSize += file.size;
+          await deleteFileEverywhere({
+            db: ctx.db,
+            workspaceId: ctx.workspaceId,
+            fileId: id,
+            deletedByUserId: ctx.userId,
+          });
         }
       }
-
-      if (totalSize > 0) {
-        await ctx.db
-          .update(workspaces)
-          .set({
-            storageUsed: sql`GREATEST(${workspaces.storageUsed} - ${totalSize}, 0)`,
-          })
-          .where(eq(workspaces.id, ctx.workspaceId));
-      }
-
-      invalidateWorkspaceVfsSnapshot(ctx.workspaceId);
       return { success: true, deleted: input.ids.length };
     }),
 });

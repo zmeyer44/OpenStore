@@ -1,18 +1,13 @@
 import { TRPCError } from "@trpc/server";
 import { eq, and, sql } from "drizzle-orm";
-import { randomUUID } from "crypto";
 import { createRouter, workspaceProcedure } from "../init";
-import { files, folders, workspaces } from "@locker/database";
+import { fileBlobs, files, folders, workspaces } from "@locker/database";
 import {
   createStorageForWorkspace,
   createStorageForFile,
   shouldEnforceQuota,
 } from "../../../server/storage";
-import { qmdClient, streamToString } from "../../plugins/handlers/qmd-client";
-import { ftsClient } from "../../plugins/handlers/fts-client";
-import { resolvePluginEndpoint } from "../../plugins/resolve-endpoint";
 import { invalidateWorkspaceVfsSnapshot } from "../../vfs/locker-vfs";
-import { isTextIndexable, transcribeFile } from "../../plugins/transcription";
 import {
   initiateUploadSchema,
   completeUploadSchema,
@@ -20,6 +15,11 @@ import {
   MULTIPART_THRESHOLD,
   MULTIPART_PART_SIZE,
 } from "@locker/common";
+import {
+  createPendingFileUpload,
+  markFileUploadReady,
+} from "../../stores/file-records";
+import { runFileReadyHooks } from "../../stores/lifecycle";
 
 export const uploadsRouter = createRouter({
   getProvider: workspaceProcedure.query(async ({ ctx }) => {
@@ -77,46 +77,37 @@ export const uploadsRouter = createRouter({
         }
       }
 
-      const fileId = randomUUID();
-      const storagePath = `${workspaceId}/${fileId}/${input.fileName}`;
-      const { storage, configId, providerName } =
-        await createStorageForWorkspace(workspaceId);
-
-      // Insert file record with 'uploading' status
-      await db.insert(files).values({
-        id: fileId,
+      const pending = await createPendingFileUpload({
+        db,
         workspaceId,
         userId,
         folderId: input.folderId ?? null,
-        name: input.fileName,
+        fileName: input.fileName,
         mimeType: input.contentType,
         size: input.fileSize,
-        storagePath,
-        storageProvider: providerName,
-        storageConfigId: configId,
         status: "uploading",
       });
 
       // Determine upload strategy
-      if (!storage.supportsPresignedUpload) {
+      if (!pending.storage.supportsPresignedUpload) {
         return {
-          fileId,
-          storagePath,
+          fileId: pending.fileId,
+          storagePath: pending.storagePath,
           strategy: "server-buffered" as const,
         };
       }
 
       if (input.fileSize < MULTIPART_THRESHOLD) {
         // Single presigned PUT
-        const { url } = await storage.createPresignedUpload!({
-          path: storagePath,
+        const { url } = await pending.storage.createPresignedUpload!({
+          path: pending.storagePath,
           contentType: input.contentType,
           size: input.fileSize,
         });
 
         return {
-          fileId,
-          storagePath,
+          fileId: pending.fileId,
+          storagePath: pending.storagePath,
           strategy: "presigned-put" as const,
           presignedUrl: url,
         };
@@ -124,20 +115,20 @@ export const uploadsRouter = createRouter({
 
       // Multipart upload
       const partCount = Math.ceil(input.fileSize / MULTIPART_PART_SIZE);
-      const { uploadId } = await storage.createMultipartUpload!({
-        path: storagePath,
+      const { uploadId } = await pending.storage.createMultipartUpload!({
+        path: pending.storagePath,
         contentType: input.contentType,
       });
 
-      const { urls } = await storage.getMultipartPartUrls!({
-        path: storagePath,
+      const { urls } = await pending.storage.getMultipartPartUrls!({
+        path: pending.storagePath,
         uploadId,
         parts: partCount,
       });
 
       return {
-        fileId,
-        storagePath,
+        fileId: pending.fileId,
+        storagePath: pending.storagePath,
         strategy: "multipart" as const,
         uploadId,
         partSize: MULTIPART_PART_SIZE,
@@ -167,7 +158,7 @@ export const uploadsRouter = createRouter({
 
       // Complete multipart upload if applicable
       if (input.uploadId && input.parts) {
-        const storage = await createStorageForFile(file.storageConfigId);
+        const storage = await createStorageForFile(file.id);
         await storage.completeMultipartUpload!({
           path: file.storagePath,
           uploadId: input.uploadId,
@@ -175,12 +166,12 @@ export const uploadsRouter = createRouter({
         });
       }
 
-      // Mark as ready
+      await markFileUploadReady({ db, fileId: input.fileId });
       const [updated] = await db
-        .update(files)
-        .set({ status: "ready", updatedAt: new Date() })
+        .select()
+        .from(files)
         .where(eq(files.id, input.fileId))
-        .returning();
+        .limit(1);
 
       // Update storage usage
       await db
@@ -190,81 +181,12 @@ export const uploadsRouter = createRouter({
         })
         .where(eq(workspaces.id, workspaceId));
 
-      // Fire-and-forget: index file for QMD search
-      if (qmdClient.shouldIndex(file.mimeType)) {
-        void (async () => {
-          try {
-            const endpoint = await resolvePluginEndpoint(
-              db,
-              workspaceId,
-              "qmd-search",
-              {
-                serviceUrl: process.env.QMD_SERVICE_URL,
-                apiSecret: process.env.QMD_API_SECRET,
-              },
-            );
-            if (!endpoint) return;
-            const storage = await createStorageForFile(file.storageConfigId);
-            const { data } = await storage.download(file.storagePath);
-            const content = await streamToString(data);
-            await qmdClient.indexFile(
-              {
-                workspaceId,
-                fileId: input.fileId,
-                fileName: file.name,
-                mimeType: file.mimeType,
-                content,
-              },
-              endpoint,
-            );
-          } catch {}
-        })();
-      }
-
-      // Fire-and-forget: index file for FTS search
-      if (ftsClient.shouldIndex(file.mimeType)) {
-        void (async () => {
-          try {
-            const endpoint = await resolvePluginEndpoint(
-              db,
-              workspaceId,
-              "fts-search",
-              {
-                serviceUrl: process.env.FTS_SERVICE_URL,
-                apiSecret: process.env.FTS_API_SECRET,
-              },
-            );
-            if (!endpoint) return;
-            const storage = await createStorageForFile(file.storageConfigId);
-            const { data } = await storage.download(file.storagePath);
-            const content = await streamToString(data);
-            await ftsClient.indexFile(
-              {
-                workspaceId,
-                fileId: input.fileId,
-                fileName: file.name,
-                mimeType: file.mimeType,
-                content,
-              },
-              endpoint,
-            );
-          } catch {}
-        })();
-      }
-
-      // Fire-and-forget: transcribe non-text files (images, PDFs, etc.)
-      if (!isTextIndexable(file.mimeType)) {
-        void transcribeFile({
-          db,
-          workspaceId,
-          userId: ctx.userId,
-          fileId: input.fileId,
-          fileName: file.name,
-          mimeType: file.mimeType,
-          storagePath: file.storagePath,
-          storageConfigId: file.storageConfigId,
-        }).catch(() => {});
-      }
+      void runFileReadyHooks({
+        db,
+        workspaceId,
+        userId: ctx.userId,
+        fileId: input.fileId,
+      }).catch(() => {});
 
       invalidateWorkspaceVfsSnapshot(workspaceId);
       return updated;
@@ -284,7 +206,7 @@ export const uploadsRouter = createRouter({
 
       if (!file) return { success: true };
 
-      const storage = await createStorageForFile(file.storageConfigId);
+      const storage = await createStorageForFile(file.id);
 
       // Abort multipart upload if applicable
       if (input.uploadId) {
@@ -306,7 +228,10 @@ export const uploadsRouter = createRouter({
       }
 
       // Delete the file record
-      await db.delete(files).where(eq(files.id, input.fileId));
+      await db.transaction(async (tx) => {
+        await tx.delete(files).where(eq(files.id, input.fileId));
+        await tx.delete(fileBlobs).where(eq(fileBlobs.id, file.blobId));
+      });
 
       invalidateWorkspaceVfsSnapshot(workspaceId);
       return { success: true };

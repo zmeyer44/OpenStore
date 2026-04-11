@@ -95,8 +95,6 @@ export interface PluginHandler {
       fileId: string;
       fileName: string;
       mimeType: string;
-      storagePath: string;
-      storageConfigId: string | null;
     },
   ): Promise<TranscriptionResult>;
 

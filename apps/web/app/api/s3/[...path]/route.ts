@@ -23,7 +23,10 @@ import {
 } from "@/server/s3/paths";
 import { getDb } from "@locker/database/client";
 import {
+  blobLocations,
+  fileBlobs,
   files,
+  stores,
   workspaces,
   s3MultipartUploads,
   s3MultipartParts,
@@ -31,9 +34,18 @@ import {
 import {
   createStorageForWorkspace,
   createStorageForFile,
+  getFileLocationContext,
+  getFileStoragePath,
+  getFileStoreId,
+  getStoreById,
   shouldEnforceQuota,
 } from "../../../../server/storage";
 import { eq, and, like, sql, isNull } from "drizzle-orm";
+import {
+  createPendingFileUpload,
+  markFileUploadReady,
+} from "../../../../server/stores/file-records";
+import { deleteFileEverywhere, runFileReadyHooks } from "../../../../server/stores/lifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +77,66 @@ async function verifyBucket(
     .where(eq(workspaces.id, auth.workspaceId));
   if (!ws || ws.slug !== slug) return null;
   return ws;
+}
+
+async function replaceWritableLocations(params: {
+  db: ReturnType<typeof getDb>;
+  blobId: string;
+  keepStoreId: string;
+  keepPath: string;
+}) {
+  const locations = await params.db
+    .select({
+      storeId: blobLocations.storeId,
+      storagePath: blobLocations.storagePath,
+      writeMode: stores.writeMode,
+    })
+    .from(blobLocations)
+    .innerJoin(stores, eq(blobLocations.storeId, stores.id))
+    .where(eq(blobLocations.blobId, params.blobId));
+
+  for (const location of locations) {
+    if (location.storeId === params.keepStoreId) continue;
+
+    if (location.writeMode === "write") {
+      try {
+        const { storage } = await getStoreById(location.storeId);
+        await storage.delete(location.storagePath);
+      } catch {
+        // Best-effort replica cleanup.
+      }
+    }
+
+    await params.db
+      .delete(blobLocations)
+      .where(
+        and(
+          eq(blobLocations.blobId, params.blobId),
+          eq(blobLocations.storeId, location.storeId),
+        ),
+      );
+  }
+
+  await params.db
+    .insert(blobLocations)
+    .values({
+      blobId: params.blobId,
+      storeId: params.keepStoreId,
+      storagePath: params.keepPath,
+      state: "available",
+      origin: "primary_upload",
+      lastVerifiedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [blobLocations.blobId, blobLocations.storeId],
+      set: {
+        storagePath: params.keepPath,
+        state: "available",
+        lastError: null,
+        lastVerifiedAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
 }
 
 // ── GET: GetObject or ListObjectsV2 ────────────────────────────────────
@@ -100,8 +172,8 @@ export async function GET(
   if (!file) return noSuchKey(key);
 
   try {
-    const storage = await createStorageForFile(file.storageConfigId);
-    const result = await storage.download(file.storagePath);
+    const { storage, storagePath } = await getFileLocationContext(file.id);
+    const result = await storage.download(storagePath);
     return new Response(result.data as any, {
       status: 200,
       headers: {
@@ -180,19 +252,12 @@ export async function DELETE(
     .where(and(eq(files.workspaceId, auth.workspaceId), eq(files.s3Key, key)));
 
   if (file) {
-    try {
-      const storage = await createStorageForFile(file.storageConfigId);
-      await storage.delete(file.storagePath);
-    } catch {
-      /* best effort */
-    }
-    await db.delete(files).where(eq(files.id, file.id));
-    await db
-      .update(workspaces)
-      .set({
-        storageUsed: sql`GREATEST(${workspaces.storageUsed} - ${file.size}, 0)`,
-      })
-      .where(eq(workspaces.id, auth.workspaceId));
+    await deleteFileEverywhere({
+      db,
+      workspaceId: auth.workspaceId,
+      fileId: file.id,
+      deletedByUserId: auth.userId,
+    });
   }
 
   return new Response(null, { status: 204 });
@@ -310,9 +375,9 @@ async function handlePutObject(
     const [existing] = await db
       .select({
         id: files.id,
+        blobId: files.blobId,
         size: files.size,
         storagePath: files.storagePath,
-        storageConfigId: files.storageConfigId,
       })
       .from(files)
       .where(
@@ -334,43 +399,42 @@ async function handlePutObject(
       dirSegments,
     );
 
-    const { storage, configId, providerName } = await createStorageForWorkspace(
-      auth.workspaceId,
-    );
-    const fileId = existing?.id ?? randomUUID();
-    const storagePath =
-      existing?.storagePath ?? `${auth.workspaceId}/${fileId}/${fileName}`;
-
-    await storage.upload({
-      path: storagePath,
-      data: req.body as unknown as ReadableStream,
-      contentType,
-    });
-
     if (existing) {
-      // If the config changed, clean up old data from the previous backend
-      if (existing.storageConfigId !== configId) {
-        try {
-          const oldStorage = await createStorageForFile(
-            existing.storageConfigId,
-          );
-          await oldStorage.delete(existing.storagePath);
-        } catch {
-          /* best effort */
-        }
-      }
+      const primary = await createStorageForWorkspace(auth.workspaceId);
+      await primary.storage.upload({
+        path: existing.storagePath,
+        data: req.body as unknown as ReadableStream,
+        contentType,
+      });
+
+      await replaceWritableLocations({
+        db,
+        blobId: existing.blobId,
+        keepStoreId: primary.storeId,
+        keepPath: existing.storagePath,
+      });
 
       await db
         .update(files)
         .set({
+          name: fileName,
+          folderId,
           size: contentLength,
           mimeType: contentType,
-          storagePath,
-          storageProvider: providerName,
-          storageConfigId: configId,
+          storageProvider: primary.providerName,
+          status: "ready",
           updatedAt: new Date(),
         })
         .where(eq(files.id, existing.id));
+      await db
+        .update(fileBlobs)
+        .set({
+          byteSize: contentLength,
+          mimeType: contentType,
+          state: "ready",
+          updatedAt: new Date(),
+        })
+        .where(eq(fileBlobs.id, existing.blobId));
       const sizeDiff = contentLength - existing.size;
       if (sizeDiff !== 0) {
         await db
@@ -380,31 +444,53 @@ async function handlePutObject(
           })
           .where(eq(workspaces.id, auth.workspaceId));
       }
+
+      void runFileReadyHooks({
+        db,
+        workspaceId: auth.workspaceId,
+        userId: auth.userId,
+        fileId: existing.id,
+      }).catch(() => {});
+
+      return new Response(null, {
+        status: 200,
+        headers: { ETag: `"${existing.id}"` },
+      });
     } else {
-      await db.insert(files).values({
-        id: fileId,
+      const pending = await createPendingFileUpload({
+        db,
         workspaceId: auth.workspaceId,
         userId: auth.userId,
         folderId,
-        name: fileName,
+        fileName,
         mimeType: contentType,
         size: contentLength,
-        storagePath,
-        storageProvider: providerName,
-        storageConfigId: configId,
-        status: "ready",
+        status: "uploading",
         s3Key: key,
       });
+      await pending.storage.upload({
+        path: pending.storagePath,
+        data: req.body as unknown as ReadableStream,
+        contentType,
+      });
+      await markFileUploadReady({ db, fileId: pending.fileId });
       await db
         .update(workspaces)
         .set({ storageUsed: sql`${workspaces.storageUsed} + ${contentLength}` })
         .where(eq(workspaces.id, auth.workspaceId));
-    }
 
-    return new Response(null, {
-      status: 200,
-      headers: { ETag: `"${fileId}"` },
-    });
+      void runFileReadyHooks({
+        db,
+        workspaceId: auth.workspaceId,
+        userId: auth.userId,
+        fileId: pending.fileId,
+      }).catch(() => {});
+
+      return new Response(null, {
+        status: 200,
+        headers: { ETag: `"${pending.fileId}"` },
+      });
+    }
   } catch (err) {
     return internalError((err as Error).message);
   }
@@ -418,9 +504,38 @@ async function handleCreateMultipart(
   contentType: string,
 ): Promise<Response> {
   const uploadId = randomUUID();
-  const { fileName } = parseS3Key(key);
-  const fileId = randomUUID();
-  const storagePath = `${auth.workspaceId}/${fileId}/${fileName}`;
+  const { dirSegments, fileName } = parseS3Key(key);
+  if (!fileName) return invalidRequest("Object key must include a file name");
+
+  const [existing] = await db
+    .select({
+      id: files.id,
+      storagePath: files.storagePath,
+    })
+    .from(files)
+    .where(and(eq(files.workspaceId, auth.workspaceId), eq(files.s3Key, key)))
+    .limit(1);
+
+  const folderId = await resolveOrCreateFolderChain(
+    db,
+    auth.workspaceId,
+    auth.userId,
+    dirSegments,
+  );
+  const pending =
+    existing ??
+    (await createPendingFileUpload({
+      db,
+      workspaceId: auth.workspaceId,
+      userId: auth.userId,
+      folderId,
+      fileName,
+      mimeType: contentType,
+      size: 0,
+      status: "uploading",
+      s3Key: key,
+    }));
+  const storagePath = pending.storagePath;
 
   await db.insert(s3MultipartUploads).values({
     workspaceId: auth.workspaceId,
@@ -586,19 +701,26 @@ async function handleCompleteMultipart(
 
   if (parts.length === 0) return invalidRequest("No parts uploaded");
 
-  const [existing] = await db
+  const [targetFile] = await db
     .select({
       id: files.id,
+      blobId: files.blobId,
       size: files.size,
       storagePath: files.storagePath,
-      storageConfigId: files.storageConfigId,
+      status: files.status,
     })
     .from(files)
-    .where(and(eq(files.workspaceId, auth.workspaceId), eq(files.s3Key, key)));
+    .where(
+      and(
+        eq(files.workspaceId, auth.workspaceId),
+        eq(files.storagePath, upload.storagePath),
+      ),
+    )
+    .limit(1);
 
   const totalSize = parts.reduce((sum, part) => sum + part.size, 0);
   const projectedUsed =
-    (ws.storageUsed ?? 0) - (existing?.size ?? 0) + totalSize;
+    (ws.storageUsed ?? 0) - (targetFile?.size ?? 0) + totalSize;
   if (
     (await shouldEnforceQuota(auth.workspaceId)) &&
     projectedUsed > (ws.storageLimit ?? 0)
@@ -611,7 +733,11 @@ async function handleCompleteMultipart(
     return invalidRequest("Object key must include a file name");
   }
 
-  const { storage, configId, providerName } = await createStorageForWorkspace(
+  if (!targetFile) {
+    return invalidRequest("Multipart upload target is missing");
+  }
+
+  const { storage, storeId, providerName } = await createStorageForWorkspace(
     auth.workspaceId,
   );
 
@@ -632,54 +758,43 @@ async function handleCompleteMultipart(
     );
     const etag = createHash("md5").update(uploadId).digest("hex");
 
-    const sizeDiff = totalSize - (existing?.size ?? 0);
-    if (existing) {
-      // Clean up old data from previous backend if config changed
-      if (existing.storageConfigId !== configId) {
-        try {
-          const oldStorage = await createStorageForFile(
-            existing.storageConfigId,
-          );
-          await oldStorage.delete(existing.storagePath);
-        } catch {
-          /* best effort */
-        }
-      } else if (existing.storagePath !== upload.storagePath) {
-        try {
-          await storage.delete(existing.storagePath);
-        } catch {
-          /* best effort */
-        }
-      }
+    const sizeDiff = totalSize - (targetFile.size ?? 0);
 
-      await db
-        .update(files)
-        .set({
-          size: totalSize,
-          mimeType: upload.contentType,
-          storagePath: upload.storagePath,
-          storageProvider: providerName,
-          storageConfigId: configId,
-          checksum: etag,
-          updatedAt: new Date(),
-        })
-        .where(eq(files.id, existing.id));
-    } else {
-      await db.insert(files).values({
-        id: randomUUID(),
-        workspaceId: auth.workspaceId,
-        userId: auth.userId,
+    await replaceWritableLocations({
+      db,
+      blobId: targetFile.blobId,
+      keepStoreId: storeId,
+      keepPath: upload.storagePath,
+    });
+
+    await db
+      .update(files)
+      .set({
         folderId,
         name: fileName,
-        mimeType: upload.contentType,
         size: totalSize,
+        mimeType: upload.contentType,
         storagePath: upload.storagePath,
         storageProvider: providerName,
-        storageConfigId: configId,
         status: "ready",
         s3Key: key,
         checksum: etag,
-      });
+        updatedAt: new Date(),
+      })
+      .where(eq(files.id, targetFile.id));
+    await db
+      .update(fileBlobs)
+      .set({
+        byteSize: totalSize,
+        mimeType: upload.contentType,
+        checksum: etag,
+        state: "ready",
+        updatedAt: new Date(),
+      })
+      .where(eq(fileBlobs.id, targetFile.blobId));
+
+    if (targetFile.status !== "ready") {
+      await markFileUploadReady({ db, fileId: targetFile.id });
     }
 
     if (sizeDiff !== 0) {
@@ -707,6 +822,13 @@ async function handleCompleteMultipart(
         /* best effort */
       }
     }
+
+    void runFileReadyHooks({
+      db,
+      workspaceId: auth.workspaceId,
+      userId: auth.userId,
+      fileId: targetFile.id,
+    }).catch(() => {});
 
     return xmlResponse(completeMultipartUploadXml(bucket, key, etag));
   } catch (err) {
@@ -753,6 +875,29 @@ async function handleAbortMultipart(
   await db
     .delete(s3MultipartUploads)
     .where(eq(s3MultipartUploads.id, upload.id));
+
+  const [pendingFile] = await db
+    .select({
+      id: files.id,
+      status: files.status,
+    })
+    .from(files)
+    .where(
+      and(
+        eq(files.workspaceId, auth.workspaceId),
+        eq(files.storagePath, upload.storagePath),
+      ),
+    )
+    .limit(1);
+
+  if (pendingFile?.status === "uploading") {
+    await deleteFileEverywhere({
+      db,
+      workspaceId: auth.workspaceId,
+      fileId: pendingFile.id,
+      deletedByUserId: auth.userId,
+    }).catch(() => {});
+  }
 
   return new Response(null, { status: 204 });
 }

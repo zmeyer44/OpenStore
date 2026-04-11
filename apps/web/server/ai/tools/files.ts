@@ -5,8 +5,9 @@ import { files, folders, workspaces, fileTranscriptions } from "@locker/database
 import { resolvePluginEndpoint } from "../../plugins/resolve-endpoint";
 import { qmdClient } from "../../plugins/handlers/qmd-client";
 import { ftsClient } from "../../plugins/handlers/fts-client";
-import { createStorageForFile } from "../../storage";
+import { createStorageForFile, getFileStoragePath } from "../../storage";
 import { invalidateWorkspaceVfsSnapshot } from "../../vfs/locker-vfs";
+import { deleteFileEverywhere } from "../../stores/lifecycle";
 import type { AssistantToolContext } from "./types";
 
 export function createFileTools(ctx: AssistantToolContext) {
@@ -429,16 +430,12 @@ export function createFileTools(ctx: AssistantToolContext) {
             : Promise.resolve(),
         ]);
 
-        try {
-          const storage = await createStorageForFile(
-            file.storageConfigId,
-          );
-          if (storage && file.storagePath) {
-            await storage.delete(file.storagePath);
-          }
-        } catch {
-          // Storage deletion is best-effort
-        }
+        await deleteFileEverywhere({
+          db: ctx.db,
+          workspaceId: ctx.workspaceId,
+          fileId,
+          deletedByUserId: ctx.userId,
+        });
 
         invalidateWorkspaceVfsSnapshot(ctx.workspaceId);
         return { success: true, deletedFile: file.name };
@@ -455,8 +452,6 @@ export function createFileTools(ctx: AssistantToolContext) {
           .select({
             id: files.id,
             name: files.name,
-            storagePath: files.storagePath,
-            storageConfigId: files.storageConfigId,
           })
           .from(files)
           .where(
@@ -467,12 +462,15 @@ export function createFileTools(ctx: AssistantToolContext) {
           )
           .limit(1);
 
-        if (!file || !file.storagePath) return { error: "File not found" };
+        if (!file) return { error: "File not found" };
 
         try {
-          const storage = await createStorageForFile(file.storageConfigId);
+          const storage = await createStorageForFile(file.id);
           if (storage) {
-            const url = await storage.getSignedUrl(file.storagePath, 3600);
+            const url = await storage.getSignedUrl(
+              await getFileStoragePath(file.id),
+              3600,
+            );
             return { downloadUrl: url, fileName: file.name };
           }
         } catch {
@@ -480,8 +478,9 @@ export function createFileTools(ctx: AssistantToolContext) {
         }
 
         // Fallback to serve route
+        const fallbackPath = await getFileStoragePath(file.id);
         return {
-          downloadUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/files/serve/${file.storagePath}`,
+          downloadUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/files/serve/${fallbackPath}`,
           fileName: file.name,
         };
       },

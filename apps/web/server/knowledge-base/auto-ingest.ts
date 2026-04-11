@@ -9,7 +9,7 @@ import {
 } from "@locker/database";
 import type { Database } from "@locker/database";
 import { isTextIndexable } from "@locker/common";
-import { createStorageForFile } from "../storage";
+import { createStorageForFile, getFileStoragePath } from "../storage";
 import { getHandler, buildPluginContext } from "../plugins/runtime";
 
 // ---------------------------------------------------------------------------
@@ -29,11 +29,12 @@ async function streamToString(stream: ReadableStream): Promise<string> {
 
 async function getFileContent(
   db: Database,
-  file: { id: string; mimeType: string; storagePath: string; storageConfigId: string | null },
+  file: { id: string; mimeType: string },
 ): Promise<string | null> {
   if (isTextIndexable(file.mimeType)) {
-    const storage = await createStorageForFile(file.storageConfigId);
-    const { data } = await storage.download(file.storagePath);
+    const storage = await createStorageForFile(file.id);
+    const storagePath = await getFileStoragePath(file.id);
+    const { data } = await storage.download(storagePath);
     return streamToString(data);
   }
 
@@ -83,8 +84,6 @@ export async function ingestFileIntoKB(params: {
       id: files.id,
       name: files.name,
       mimeType: files.mimeType,
-      storagePath: files.storagePath,
-      storageConfigId: files.storageConfigId,
     })
     .from(files)
     .where(and(eq(files.id, fileId), eq(files.workspaceId, workspaceId)))

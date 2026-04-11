@@ -18,6 +18,7 @@ import {
   generateSlug,
 } from "@locker/common";
 import { getBuiltinPluginBySlug } from "../../plugins/catalog";
+import { createDefaultStoreForWorkspace } from "../../storage";
 
 export const workspacesRouter = createRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -100,14 +101,16 @@ export const workspacesRouter = createRouter({
         })
         .returning();
 
-      // Add creator as owner
       await ctx.db.insert(workspaceMembers).values({
         workspaceId: workspace!.id,
         userId: ctx.userId,
         role: "owner",
       });
 
-      // Auto-install default plugins
+      await createDefaultStoreForWorkspace({
+        workspaceId: workspace!.id,
+      });
+
       const defaultPlugins = ["fts-search", "document-transcription"];
       for (const slug of defaultPlugins) {
         const manifest = getBuiltinPluginBySlug(slug);

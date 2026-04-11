@@ -24,6 +24,10 @@ export interface StorageProvider {
 
   exists(path: string): Promise<boolean>;
 
+  list?(
+    prefix: string,
+  ): Promise<{ path: string; size: number; lastModified: Date }[]>;
+
   // Presigned upload support
   readonly supportsPresignedUpload: boolean;
 

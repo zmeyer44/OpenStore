@@ -23,7 +23,7 @@ const r2CredentialsSchema = z.object({
 });
 
 const vercelCredentialsSchema = z.object({
-  provider: z.literal("vercel"),
+  provider: z.literal("vercel_blob"),
   readWriteToken: z.string().min(1, "Read/Write Token is required"),
 });
 
@@ -35,7 +35,7 @@ const credentialsSchema = z.discriminatedUnion("provider", [
 
 const saveConfigSchema = z
   .object({
-    provider: z.enum(["s3", "r2", "vercel"]),
+    provider: z.enum(["s3", "r2", "vercel_blob"]),
     bucket: z.string().min(1, "Bucket name is required"),
     region: z.string().optional(),
     endpoint: z.string().optional(),

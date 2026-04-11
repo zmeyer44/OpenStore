@@ -4,7 +4,10 @@ import { randomBytes } from "crypto";
 import { createRouter, workspaceProcedure, publicProcedure } from "../init";
 import { shareLinks, files, folders } from "@locker/database";
 import { createShareLinkSchema, SHARE_TOKEN_LENGTH } from "@locker/common";
-import { createStorageForFile } from "../../../server/storage";
+import {
+  createStorageForFile,
+  getFileStoragePath,
+} from "../../../server/storage";
 import { hashLinkPassword, verifyLinkPassword } from "../../security/password";
 
 function generateToken(): string {
@@ -441,8 +444,11 @@ export const sharesRouter = createRouter({
         if (!allowed) throw new Error("File not found");
       }
 
-      const storage = await createStorageForFile(targetFile.storageConfigId);
-      const url = await storage.getSignedUrl(targetFile.storagePath, 3600);
+      const storage = await createStorageForFile(targetFile.id);
+      const url = await storage.getSignedUrl(
+        await getFileStoragePath(targetFile.id),
+        3600,
+      );
 
       const [updated] = await ctx.db
         .update(shareLinks)

@@ -24,6 +24,7 @@ import {
   User,
   Boxes,
   Bell,
+  HardDrive,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/assets/logo";
@@ -398,6 +399,12 @@ function WorkspaceNav({
       label: "Settings",
       icon: Settings,
       key: "settings",
+    },
+    {
+      href: `${prefix}/settings/stores`,
+      label: "Stores",
+      icon: HardDrive,
+      key: "stores",
     },
     {
       href: `${prefix}/settings/members`,
