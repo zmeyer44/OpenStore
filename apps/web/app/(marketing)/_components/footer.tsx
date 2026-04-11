@@ -1,6 +1,7 @@
 import { Logo } from "@/assets/logo";
 import Link from "next/link";
-import { GITHUB_URL } from "@/constants/app";
+import { GithubIcon } from "lucide-react";
+import { GITHUB_URL, X_URL } from "@/constants/app";
 
 const footerSections = [
   {
@@ -64,10 +65,35 @@ export function Footer() {
           </div>
         ))}
 
-        <div className="col-span-full mt-8 border-t border-white/10 pt-6">
+        <div className="col-span-full mt-8 flex items-center justify-between border-t border-white/10 pt-6">
           <p className="text-white/30 text-xs">
             &copy; {new Date().getFullYear()} Locker. All rights reserved.
           </p>
+          <div className="flex items-center gap-3">
+            <Link
+              href={X_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/30 transition-colors hover:text-white"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="size-4"
+                aria-label="X"
+              >
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+              </svg>
+            </Link>
+            <Link
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/30 transition-colors hover:text-white"
+            >
+              <GithubIcon className="size-4" />
+            </Link>
+          </div>
         </div>
       </div>
     </footer>
