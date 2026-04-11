@@ -349,25 +349,27 @@ export const storesRouter = createRouter({
 
       await testStoreConnection(input.store);
 
-      await ctx.db
-        .update(stores)
-        .set({
-          name: input.store.name,
-          provider: input.store.provider,
-          writeMode: input.store.writeMode,
-          ingestMode: input.store.ingestMode,
-          readPriority: input.store.readPriority,
-          config: buildStoreConfig(input.store),
-          updatedAt: new Date(),
-          lastTestedAt: new Date(),
-        })
-        .where(eq(stores.id, input.id));
+      return ctx.db.transaction(async (tx) => {
+        await tx
+          .update(stores)
+          .set({
+            name: input.store.name,
+            provider: input.store.provider,
+            writeMode: input.store.writeMode,
+            ingestMode: input.store.ingestMode,
+            readPriority: input.store.readPriority,
+            config: buildStoreConfig(input.store),
+            updatedAt: new Date(),
+            lastTestedAt: new Date(),
+          })
+          .where(eq(stores.id, input.id));
 
-      if (input.store.credentials) {
-        await saveStoreSecret(input.id, input.store.credentials);
-      }
+        if (input.store.credentials) {
+          await saveStoreSecret(input.id, input.store.credentials, tx);
+        }
 
-      return { success: true };
+        return { success: true };
+      });
     }),
 
   remove: workspaceAdminProcedure
