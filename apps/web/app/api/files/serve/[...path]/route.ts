@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { verifyLocalFileSignature } from "@locker/storage";
-import { createStorageForFile } from "../../../../../server/storage";
+import { createStorageForFile, getFileStoragePath } from "../../../../../server/storage";
 import { getDb } from "@locker/database/client";
 import { files } from "@locker/database";
 import { eq } from "drizzle-orm";
@@ -48,13 +48,16 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   const storage = fileRecord
     ? await createStorageForFile(fileRecord.id)
     : null;
+  const resolvedPath = fileRecord
+    ? await getFileStoragePath(fileRecord.id)
+    : null;
 
   try {
-    if (!storage) {
+    if (!storage || !resolvedPath) {
       return new Response("File not found", { status: 404 });
     }
 
-    const file = await storage.download(objectPath);
+    const file = await storage.download(resolvedPath);
     return new Response(file.data, {
       status: 200,
       headers: {

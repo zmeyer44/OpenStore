@@ -266,7 +266,9 @@ async function getFileLocationContext(
     ? locations.find((location) => location.store.id === preferredStoreId)
     : undefined;
   const exactPathLocation = locations.find(
-    (location) => location.storagePath === file.storagePath,
+    (location) =>
+      location.storagePath === file.storagePath &&
+      location.state !== "failed",
   );
   const availableLocation = locations.find(
     (location) => location.state === "available" || location.state === "pending",
