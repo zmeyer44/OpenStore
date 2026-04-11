@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { files } from "@locker/database";
-import { createStorageForFile } from "../../storage";
+import { createStorageForFile, getFileStoragePath } from "../../storage";
 import { getBuiltinPluginBySlug } from "../catalog";
 import { ftsClient } from "./fts-client";
 import type { EndpointConfig } from "./fts-client";
@@ -55,7 +55,6 @@ export const ftsSearchHandler: PluginHandler = {
 
         if (file && ftsClient.shouldIndex(file.mimeType)) {
           const storage = await createStorageForFile(target.id);
-          const { getFileStoragePath } = await import("../../storage");
           const { data } = await storage.download(
             await getFileStoragePath(target.id),
           );

@@ -9,7 +9,6 @@ import {
 import {
   buildStoragePathForStore,
   createStorageForWorkspace,
-  getStoreById,
 } from "../storage";
 
 export async function createPendingFileUpload(params: {
@@ -30,8 +29,7 @@ export async function createPendingFileUpload(params: {
   const blobId = params.blobId ?? randomUUID();
   const objectKey = `${workspaceId}/${blobId}/${params.fileName}`;
   const primary = await createStorageForWorkspace(workspaceId);
-  const { store } = await getStoreById(primary.storeId);
-  const storagePath = buildStoragePathForStore(store, objectKey);
+  const storagePath = buildStoragePathForStore(primary.store, objectKey);
 
   await db.insert(fileBlobs).values({
     id: blobId,
@@ -45,7 +43,7 @@ export async function createPendingFileUpload(params: {
 
   await db.insert(blobLocations).values({
     blobId,
-    storeId: store.id,
+    storeId: primary.storeId,
     storagePath,
     state: params.status === "ready" ? "available" : "pending",
     origin: "primary_upload",

@@ -1,4 +1,4 @@
-import { createStorageForFile } from "../../storage";
+import { createStorageForFile, getFileStoragePath } from "../../storage";
 import { getBuiltinPluginBySlug } from "../catalog";
 import { qmdClient, streamToString } from "./qmd-client";
 import type { EndpointConfig } from "./fts-client";
@@ -63,7 +63,6 @@ export const qmdSearchHandler: PluginHandler = {
 
         if (file && qmdClient.shouldIndex(file.mimeType)) {
           const storage = await createStorageForFile(target.id);
-          const { getFileStoragePath } = await import("../../storage");
           const { data } = await storage.download(
             await getFileStoragePath(target.id),
           );

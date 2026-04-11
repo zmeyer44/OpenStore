@@ -131,6 +131,7 @@ async function hydrateStore(
 
 export interface WorkspaceStorageResult {
   storage: StorageProvider;
+  store: StoreRow;
   storeId: string;
   providerName: string;
 }
@@ -195,6 +196,7 @@ export async function createStorageForWorkspace(
   const { store, storage } = await getPrimaryStore(workspaceId);
   return {
     storage,
+    store,
     storeId: store.id,
     providerName: providerNameMap[store.provider],
   };

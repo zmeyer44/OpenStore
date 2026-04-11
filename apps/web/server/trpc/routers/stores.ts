@@ -25,9 +25,21 @@ const storePayloadSchema = z
     readPriority: z.number().int().min(0).max(1000).default(100),
     bucket: z.string().optional(),
     region: z.string().optional(),
-    endpoint: z.string().url().optional(),
+    endpoint: z
+      .string()
+      .url()
+      .refine((u) => u.startsWith("https://") || u.startsWith("http://"), {
+        message: "Endpoint must use http:// or https://",
+      })
+      .optional(),
     accountId: z.string().optional(),
-    publicUrl: z.string().url().optional(),
+    publicUrl: z
+      .string()
+      .url()
+      .refine((u) => u.startsWith("https://") || u.startsWith("http://"), {
+        message: "Public URL must use http:// or https://",
+      })
+      .optional(),
     baseDir: z.string().optional(),
     rootPrefix: z.string().optional(),
     credentials: z

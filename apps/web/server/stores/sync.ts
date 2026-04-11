@@ -361,7 +361,7 @@ export async function ingestFromReadOnlyStore(params: {
   const db = getDatabase(params.db);
   const { store, storage } = await getStoreById(params.storeId);
 
-  if (store.writeMode !== "read_only" && store.ingestMode !== "scan") {
+  if (store.writeMode !== "read_only" || store.ingestMode !== "scan") {
     throw new Error("Store is not configured for read-only ingest");
   }
 
