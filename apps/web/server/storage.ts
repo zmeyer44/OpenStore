@@ -364,7 +364,7 @@ export async function createDefaultStoreForWorkspace(params: {
 export async function saveStoreSecret(
   storeId: string,
   credentials: unknown,
-  txDb?: ReturnType<typeof getDb>,
+  txDb?: Pick<ReturnType<typeof getDb>, "insert">,
 ) {
   const db = txDb ?? getDb();
   const encryptedCredentials = encryptSecret(JSON.stringify(credentials));
