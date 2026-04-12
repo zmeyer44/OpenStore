@@ -19,6 +19,7 @@ import { knowledgeBasesRouter } from "./routers/knowledge-bases";
 import { usersRouter } from "./routers/users";
 import { notificationsRouter } from "./routers/notifications";
 import { assistantRouter } from "./routers/assistant";
+import { runtimeRouter } from "./routers/runtime";
 
 export const appRouter = createRouter({
   files: filesRouter,
@@ -41,6 +42,7 @@ export const appRouter = createRouter({
   users: usersRouter,
   notifications: notificationsRouter,
   assistant: assistantRouter,
+  runtime: runtimeRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -10,11 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { formatBytes } from "@/lib/utils";
+import { useRuntime } from "@/hooks/use-runtime";
 
 export default function WorkspaceSettingsPage() {
   const workspace = useWorkspace();
   const router = useRouter();
   const { data } = trpc.workspaces.get.useQuery({ slug: workspace.slug });
+  const { data: capabilities } = useRuntime();
   const utils = trpc.useUtils();
 
   const [name, setName] = useState("");
@@ -122,6 +124,12 @@ export default function WorkspaceSettingsPage() {
                     }}
                   />
                 </div>
+              )}
+              {capabilities && capabilities.configuredPlatformStorageProvider === null && (
+                <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
+                  Storage provider is not configured. File uploads may fail.
+                  Check your environment variables.
+                </p>
               )}
             </div>
           </div>

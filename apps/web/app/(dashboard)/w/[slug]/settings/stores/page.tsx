@@ -45,6 +45,8 @@ import { useModal } from "@/components/modal/provider";
 import { ConfirmModal } from "@/components/modal/modals/confirm-modal";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { useRuntime } from "@/hooks/use-runtime";
+import type { RuntimeCapabilities } from "@locker/common";
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Types & Constants                                                         */
@@ -176,9 +178,11 @@ function relativeTime(date: Date | string | null | undefined): string {
 function StoreFormModal({
   store,
   onSuccess,
+  capabilities,
 }: {
   store?: any;
   onSuccess: () => void;
+  capabilities?: RuntimeCapabilities;
 }) {
   const modal = useModal();
   const [form, setForm] = useState<StoreForm>(
@@ -310,13 +314,13 @@ function StoreFormModal({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.entries(PROVIDER_META) as [Provider, (typeof PROVIDER_META)[Provider]][]).map(
-                  ([key, meta]) => (
+                {(Object.entries(PROVIDER_META) as [Provider, (typeof PROVIDER_META)[Provider]][])
+                  .filter(([key]) => key !== "local" || capabilities?.localFilesystemAvailable !== false)
+                  .map(([key, meta]) => (
                     <SelectItem key={key} value={key}>
                       {meta.label}
                     </SelectItem>
-                  ),
-                )}
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -569,6 +573,8 @@ export default function StoresSettingsPage() {
   const modal = useModal();
   const utils = trpc.useUtils();
   const { data: stores = [], isLoading } = trpc.stores.list.useQuery();
+  const { data: capabilities } = useRuntime();
+  const isServerless = capabilities ? !capabilities.longRunningSupported : false;
 
   // Track which stores have in-flight operations
   const [busyStores, setBusyStores] = useState<
@@ -653,11 +659,11 @@ export default function StoresSettingsPage() {
       : 0;
 
   function openAddModal() {
-    modal.show(<StoreFormModal onSuccess={invalidate} />);
+    modal.show(<StoreFormModal onSuccess={invalidate} capabilities={capabilities ?? undefined} />);
   }
 
   function openEditModal(store: any) {
-    modal.show(<StoreFormModal store={store} onSuccess={invalidate} />);
+    modal.show(<StoreFormModal store={store} onSuccess={invalidate} capabilities={capabilities ?? undefined} />);
   }
 
   function openArchiveConfirm(storeId: string) {
@@ -689,6 +695,18 @@ export default function StoresSettingsPage() {
       </header>
 
       <div className="mx-auto max-w-2xl p-6 space-y-6">
+        {capabilities && capabilities.configuredPlatformStorageProvider === null && (
+          <div className={cn(
+            "rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm",
+            "text-amber-700 dark:text-amber-400",
+          )}>
+            No platform storage provider is configured. New workspaces will fail
+            to initialize. Set{" "}
+            <code className="font-mono text-xs">BLOB_STORAGE_PROVIDER</code> and
+            the required credentials for your chosen provider.
+          </div>
+        )}
+
         {/* Header card */}
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -703,7 +721,8 @@ export default function StoresSettingsPage() {
               variant="outline"
               size="sm"
               onClick={() => syncStores.mutate({})}
-              disabled={syncStores.isPending || isRunActive}
+              disabled={syncStores.isPending || isRunActive || isServerless}
+              title={isServerless ? "Sync is not available on serverless runtimes" : undefined}
             >
               {syncStores.isPending || isRunActive ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -900,10 +919,11 @@ export default function StoresSettingsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
-                            disabled={isBusy}
+                            disabled={isBusy || isServerless}
                             onClick={() =>
                               syncStores.mutate({ storeId: store.id })
                             }
+                            title={isServerless ? "Sync is not available on serverless runtimes" : undefined}
                           >
                             <RefreshCw className="mr-2 size-3.5" />
                             Sync
@@ -911,22 +931,24 @@ export default function StoresSettingsPage() {
                           {store.writeMode === "read_only" && (
                             <>
                               <DropdownMenuItem
-                                disabled={isBusy}
+                                disabled={isBusy || isServerless}
                                 onClick={() =>
                                   ingestStore.mutate({ storeId: store.id })
                                 }
+                                title={isServerless ? "Ingest is not available on serverless runtimes" : undefined}
                               >
                                 <Upload className="mr-2 size-3.5" />
                                 Ingest
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                disabled={isBusy}
+                                disabled={isBusy || isServerless}
                                 onClick={() =>
                                   ingestStore.mutate({
                                     storeId: store.id,
                                     clearTombstones: true,
                                   })
                                 }
+                                title={isServerless ? "Ingest is not available on serverless runtimes" : undefined}
                               >
                                 <RefreshCw className="mr-2 size-3.5" />
                                 Re-ingest all

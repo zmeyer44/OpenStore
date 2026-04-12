@@ -11,6 +11,7 @@ import { createRouter, workspaceAdminProcedure } from "../init";
 import { createStorageFromConfig, type WorkspaceStorageConfig } from "@locker/storage";
 import { getStoreById, saveStoreSecret } from "../../storage";
 import { syncWorkspaceStores, ingestFromReadOnlyStore } from "../../stores/sync";
+import { runtime } from "../../runtime-context";
 
 const providerSchema = z.enum(["s3", "r2", "vercel_blob", "local"]);
 const writeModeSchema = z.enum(["write", "read_only"]);
@@ -263,6 +264,13 @@ export const storesRouter = createRouter({
   create: workspaceAdminProcedure
     .input(storePayloadSchema)
     .mutation(async ({ ctx, input }) => {
+      if (input.provider === "local" && !runtime.localFilesystemAvailable) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `Local storage is not available on this runtime (${runtime.environment}). Choose a cloud storage provider.`,
+        });
+      }
+
       await testStoreConnection(input);
 
       const [existingSettings] = await ctx.db
@@ -321,6 +329,13 @@ export const storesRouter = createRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      if (input.store.provider === "local" && !runtime.localFilesystemAvailable) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `Local storage is not available on this runtime (${runtime.environment}). Choose a cloud storage provider.`,
+        });
+      }
+
       const [existing] = await ctx.db
         .select({
           id: stores.id,
@@ -473,6 +488,13 @@ export const storesRouter = createRouter({
   test: workspaceAdminProcedure
     .input(storePayloadSchema)
     .mutation(async ({ ctx, input }) => {
+      if (input.provider === "local" && !runtime.localFilesystemAvailable) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `Local storage is not available on this runtime (${runtime.environment}). Choose a cloud storage provider.`,
+        });
+      }
+
       await testStoreConnection(input);
       return { success: true };
     }),
@@ -486,6 +508,13 @@ export const storesRouter = createRouter({
         .optional(),
     )
     .mutation(async ({ ctx, input }) => {
+      if (!runtime.longRunningSupported) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `Store sync requires a persistent runtime. This operation is not supported on ${runtime.environment}.`,
+        });
+      }
+
       return syncWorkspaceStores({
         workspaceId: ctx.workspaceId,
         targetStoreId: input?.storeId,
@@ -520,6 +549,13 @@ export const storesRouter = createRouter({
   ingest: workspaceAdminProcedure
     .input(z.object({ storeId: z.string().uuid(), clearTombstones: z.boolean().optional() }))
     .mutation(async ({ ctx, input }) => {
+      if (!runtime.longRunningSupported) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `Store ingest requires a persistent runtime. This operation is not supported on ${runtime.environment}.`,
+        });
+      }
+
       const { store } = await getStoreById(input.storeId);
       if (store.workspaceId !== ctx.workspaceId) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Store not found" });

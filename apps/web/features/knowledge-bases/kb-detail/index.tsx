@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { useRuntime } from "@/hooks/use-runtime";
 import { ChatPanel } from "./components/chat-panel";
 import { WikiBrowser } from "./components/wiki-browser";
 import { SourceList } from "./components/source-list";
@@ -27,6 +28,7 @@ export function KBDetailPage({ id }: { id: string }) {
   const prefix = `/w/${workspace.slug}`;
   const searchParams = useSearchParams();
   const utils = trpc.useUtils();
+  const { data: capabilities } = useRuntime();
 
   // Initialize from URL search params, then manage with React state
   const [activeTab, setActiveTabState] = useState(
@@ -157,7 +159,8 @@ export function KBDetailPage({ id }: { id: string }) {
           onClick={() =>
             ingestAllMutation.mutate({ knowledgeBaseId: id })
           }
-          disabled={ingestAllMutation.isPending || isBuilding}
+          disabled={ingestAllMutation.isPending || isBuilding || !capabilities?.longRunningSupported}
+          title={capabilities && !capabilities.longRunningSupported ? "Bulk ingestion is not available on serverless runtimes" : undefined}
         >
           {ingestAllMutation.isPending || isBuilding ? (
             <Loader2 className="animate-spin" />

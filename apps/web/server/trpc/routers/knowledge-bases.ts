@@ -26,6 +26,7 @@ import {
 } from "../../storage";
 import { getHandler, buildPluginContext } from "../../plugins/runtime";
 import { ingestFileIntoKB } from "../../knowledge-base/auto-ingest";
+import { runtime } from "../../runtime-context";
 
 async function getKBWithAccess(
   db: Database,
@@ -261,6 +262,17 @@ export const knowledgeBasesRouter = createRouter({
         // Deduplicate files (a file could have multiple of the selected tags)
         const uniqueFileIds = [...new Set(taggedFiles.map((f) => f.id))];
 
+        // On serverless, skip the fire-and-forget backfill — it would be
+        // killed before completion. The client is told to run Ingest All
+        // on a persistent runtime instead.
+        if (!runtime.longRunningSupported) {
+          return {
+            ...kb,
+            initialBackfillSkipped: true,
+            initialBackfillFileCount: uniqueFileIds.length,
+          };
+        }
+
         // Set status to building while ingestion runs
         await ctx.db
           .update(knowledgeBases)
@@ -311,7 +323,7 @@ export const knowledgeBasesRouter = createRouter({
         }
       }
 
-      return kb;
+      return { ...kb, initialBackfillSkipped: false, initialBackfillFileCount: 0 };
     }),
 
   update: workspaceProcedure
@@ -619,6 +631,13 @@ export const knowledgeBasesRouter = createRouter({
         input.knowledgeBaseId,
         ctx.workspaceId,
       );
+
+      if (!runtime.longRunningSupported) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `Bulk ingestion requires a persistent runtime. This operation is not supported on ${runtime.environment}.`,
+        });
+      }
 
       if (kb.status === "building") {
         throw new TRPCError({

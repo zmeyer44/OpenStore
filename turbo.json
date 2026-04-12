@@ -28,7 +28,9 @@
     "AI_GATEWAY_API_KEY",
     "AI_GATEWAY_MODEL",
     "QMD_SERVICE_URL",
-    "QMD_API_SECRET"
+    "QMD_API_SECRET",
+    "LOCKER_RUNTIME_ENV",
+    "DOCKER_CONTAINER"
   ],
   "tasks": {
     "build": {
@@ -52,6 +54,9 @@
       "cache": false
     },
     "db:seed": {
+      "cache": false
+    },
+    "test": {
       "cache": false
     }
   }

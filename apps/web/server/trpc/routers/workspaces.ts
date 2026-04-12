@@ -17,8 +17,9 @@ import {
   updateWorkspaceSchema,
   generateSlug,
 } from "@locker/common";
+import { TRPCError } from "@trpc/server";
 import { getBuiltinPluginBySlug } from "../../plugins/catalog";
-import { createDefaultStoreForWorkspace } from "../../storage";
+import { createDefaultStoreForWorkspace, StorageConfigError } from "../../storage";
 
 export const workspacesRouter = createRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -107,9 +108,16 @@ export const workspacesRouter = createRouter({
         role: "owner",
       });
 
-      await createDefaultStoreForWorkspace({
-        workspaceId: workspace!.id,
-      });
+      try {
+        await createDefaultStoreForWorkspace({
+          workspaceId: workspace!.id,
+        });
+      } catch (err) {
+        if (err instanceof StorageConfigError) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: err.message });
+        }
+        throw err;
+      }
 
       const defaultPlugins = ["fts-search", "document-transcription"];
       for (const slug of defaultPlugins) {

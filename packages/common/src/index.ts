@@ -1,4 +1,12 @@
 export type {
+  RuntimeEnvironment,
+  RuntimeClass,
+  PlatformStorageProviderId,
+  RuntimeCapabilities,
+} from "./runtime";
+export { detectRuntime } from "./runtime";
+
+export type {
   StorageProvider,
   FileStatus,
   ShareLinkAccess,

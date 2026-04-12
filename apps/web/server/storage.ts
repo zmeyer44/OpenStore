@@ -14,6 +14,14 @@ import {
   type WorkspaceStorageConfig,
 } from "@locker/storage";
 import { decryptSecret, encryptSecret } from "./s3/auth";
+import { runtime } from "./runtime-context";
+
+export class StorageConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StorageConfigError";
+  }
+}
 
 type StoreRow = typeof stores.$inferSelect;
 
@@ -25,17 +33,10 @@ const providerNameMap = {
 } as const;
 
 function getPlatformStoreProvider(): StoreRow["provider"] {
-  switch (process.env.BLOB_STORAGE_PROVIDER) {
-    case "s3":
-      return "s3";
-    case "r2":
-      return "r2";
-    case "vercel":
-      return "vercel_blob";
-    case "local":
-    default:
-      return "local";
-  }
+  const provider = runtime.configuredPlatformStorageProvider;
+  if (provider) return provider;
+  // Fallback to intent for error messaging in createDefaultStoreForWorkspace
+  return runtime.platformStorageProvider ?? "local";
 }
 
 function getDefaultStoreName(provider: StoreRow["provider"]): string {
@@ -168,23 +169,16 @@ export async function getPrimaryStore(workspaceId: string): Promise<{
   storage: StorageProvider;
 }> {
   const db = getDb();
-  let [settings] = await db
+  const [settings] = await db
     .select({ primaryStoreId: workspaceStorageSettings.primaryStoreId })
     .from(workspaceStorageSettings)
     .where(eq(workspaceStorageSettings.workspaceId, workspaceId))
     .limit(1);
 
   if (!settings) {
-    await createDefaultStoreForWorkspace({ workspaceId });
-    [settings] = await db
-      .select({ primaryStoreId: workspaceStorageSettings.primaryStoreId })
-      .from(workspaceStorageSettings)
-      .where(eq(workspaceStorageSettings.workspaceId, workspaceId))
-      .limit(1);
-  }
-
-  if (!settings) {
-    throw new Error("Workspace storage settings not found");
+    throw new StorageConfigError(
+      "Workspace storage is not initialized. Please contact your workspace administrator.",
+    );
   }
 
   return getStoreById(settings.primaryStoreId);
@@ -313,19 +307,35 @@ export async function getFileStoreId(
 
 export async function shouldEnforceQuota(workspaceId: string): Promise<boolean> {
   const { store } = await getPrimaryStore(workspaceId);
-  return store.credentialSource === "platform" && store.provider !== "local";
+  if (store.credentialSource !== "platform") return false;
+  if (!runtime.longRunningSupported) return true;
+  return store.provider !== "local";
 }
 
 export async function shouldEnforceQuotaForFile(fileId: string): Promise<boolean> {
   const { store } = await getFileLocationContext(fileId);
-  return store.credentialSource === "platform" && store.provider !== "local";
+  if (store.credentialSource !== "platform") return false;
+  if (!runtime.longRunningSupported) return true;
+  return store.provider !== "local";
 }
 
 export async function createDefaultStoreForWorkspace(params: {
   workspaceId: string;
 }): Promise<{ storeId: string }> {
+  const configured = runtime.configuredPlatformStorageProvider;
+  if (!configured) {
+    if (runtime.platformStorageProvider) {
+      throw new StorageConfigError(
+        `Storage provider "${runtime.platformStorageProvider}" is selected but not configured. Provide the required credentials for your chosen provider.`,
+      );
+    }
+    throw new StorageConfigError(
+      "No storage provider is configured. Set BLOB_STORAGE_PROVIDER and provide the required credentials.",
+    );
+  }
+
+  const provider = configured;
   const db = getDb();
-  const provider = getPlatformStoreProvider();
   const baseConfig: Record<string, unknown> = {};
 
   if (provider === "s3") {

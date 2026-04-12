@@ -51,11 +51,17 @@ export function KBListPage() {
   const [schemaPrompt, setSchemaPrompt] = useState(DEFAULT_SCHEMA_PROMPT);
 
   const createMutation = trpc.knowledgeBases.create.useMutation({
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       await utils.knowledgeBases.list.invalidate();
       setCreateOpen(false);
       resetForm();
-      toast.success("Knowledge base created");
+      if (result.initialBackfillSkipped) {
+        toast.warning(
+          `${result.initialBackfillFileCount} source files found but initial ingestion was skipped on this runtime. Use "Ingest All" on a persistent runtime to build the knowledge base.`,
+        );
+      } else {
+        toast.success("Knowledge base created");
+      }
     },
     onError: (error) => toast.error(error.message),
   });
