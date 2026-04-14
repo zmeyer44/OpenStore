@@ -1,6 +1,6 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { fileBlobs, folders } from "@locker/database";
-import type { Database } from "@locker/database";
+import type { DatabaseClient } from "@locker/database";
 import { asConfigObject, getConfigString, joinStoragePath, type StoreRow } from "./store-utils";
 
 const UUID_RE =
@@ -13,7 +13,7 @@ const UUID_RE =
  * file "q1.pdf" at root                              => "q1.pdf"
  */
 export async function buildFolderPath(
-  db: Database,
+  db: DatabaseClient,
   workspaceId: string,
   file: { name: string; folderId: string | null },
 ): Promise<string> {
@@ -83,7 +83,7 @@ export function isLegacyObjectKey(objectKey: string): boolean {
  * If `overwrite` is true, returns the candidate unchanged.
  */
 export async function deduplicateObjectKey(
-  db: Database,
+  db: DatabaseClient,
   workspaceId: string,
   candidateKey: string,
   overwrite: boolean,
@@ -109,6 +109,7 @@ export async function deduplicateObjectKey(
         and(
           eq(fileBlobs.workspaceId, workspaceId),
           eq(fileBlobs.objectKey, current),
+          inArray(fileBlobs.state, ["ready", "pending"]),
         ),
       )
       .limit(1);

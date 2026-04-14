@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   blobLocations,
   fileBlobs,
@@ -35,64 +35,89 @@ export async function createPendingFileUpload(params: {
     name: params.fileName,
     folderId: params.folderId,
   });
-  const objectKey = await deduplicateObjectKey(
-    db,
-    workspaceId,
-    displayPath,
-    params.overwrite ?? false,
-  );
 
   const primary = await createStorageForWorkspace(workspaceId);
-  const storagePath = buildStoreTargetPath(
-    primary.store,
-    workspaceId,
-    objectKey,
-  );
 
-  await db.transaction(async (tx) => {
-    await tx.insert(fileBlobs).values({
-      id: blobId,
-      workspaceId,
-      createdById: userId,
-      objectKey,
-      byteSize: params.size,
-      mimeType: params.mimeType,
-      state: params.status === "ready" ? "ready" : "pending",
-    });
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await db.transaction(async (tx) => {
+        const objectKey = await deduplicateObjectKey(
+          tx,
+          workspaceId,
+          displayPath,
+          params.overwrite ?? false,
+        );
 
-    await tx.insert(blobLocations).values({
-      blobId,
-      storeId: primary.storeId,
-      storagePath,
-      state: params.status === "ready" ? "available" : "pending",
-      origin: "primary_upload",
-    });
+        const storagePath = buildStoreTargetPath(
+          primary.store,
+          workspaceId,
+          objectKey,
+        );
 
-    await tx.insert(files).values({
-      id: fileId,
-      workspaceId,
-      userId,
-      folderId: params.folderId,
-      blobId,
-      name: params.fileName,
-      mimeType: params.mimeType,
-      size: params.size,
-      storagePath,
-      storageProvider: primary.providerName,
-      status: params.status ?? "uploading",
-      s3Key: params.s3Key ?? null,
-    });
-  });
+        // Remove stale (failed/deleted) blobs that hold this key in the
+        // unique index. Cascades to blob_locations and files.
+        await tx.delete(fileBlobs).where(
+          and(
+            eq(fileBlobs.workspaceId, workspaceId),
+            eq(fileBlobs.objectKey, objectKey),
+            inArray(fileBlobs.state, ["failed", "deleted"]),
+          ),
+        );
 
-  return {
-    fileId,
-    blobId,
-    objectKey,
-    storagePath,
-    storeId: primary.storeId,
-    providerName: primary.providerName,
-    storage: primary.storage,
-  };
+        await tx.insert(fileBlobs).values({
+          id: blobId,
+          workspaceId,
+          createdById: userId,
+          objectKey,
+          byteSize: params.size,
+          mimeType: params.mimeType,
+          state: params.status === "ready" ? "ready" : "pending",
+        });
+
+        await tx.insert(blobLocations).values({
+          blobId,
+          storeId: primary.storeId,
+          storagePath,
+          state: params.status === "ready" ? "available" : "pending",
+          origin: "primary_upload",
+        });
+
+        await tx.insert(files).values({
+          id: fileId,
+          workspaceId,
+          userId,
+          folderId: params.folderId,
+          blobId,
+          name: params.fileName,
+          mimeType: params.mimeType,
+          size: params.size,
+          storagePath,
+          storageProvider: primary.providerName,
+          status: params.status ?? "uploading",
+          s3Key: params.s3Key ?? null,
+        });
+
+        return {
+          fileId,
+          blobId,
+          objectKey,
+          storagePath,
+          storeId: primary.storeId,
+          providerName: primary.providerName,
+          storage: primary.storage,
+        };
+      });
+    } catch (err: unknown) {
+      const code = err instanceof Error && "code" in err
+        ? (err as Error & { code: string }).code
+        : undefined;
+      if (code === "23505" && attempt < MAX_RETRIES) continue;
+      throw err;
+    }
+  }
+
+  throw new Error("Exhausted retries for createPendingFileUpload");
 }
 
 export async function markFileUploadReady(params: {

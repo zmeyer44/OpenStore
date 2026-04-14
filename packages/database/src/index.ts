@@ -2,4 +2,4 @@
 export * from './schema/index';
 
 // Client
-export { getDb, type Database } from './client';
+export { getDb, type Database, type DatabaseClient } from './client';

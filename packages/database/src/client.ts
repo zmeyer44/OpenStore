@@ -1,4 +1,7 @@
+import type { ExtractTablesWithRelations } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
+import type { NodePgQueryResultHKT } from 'drizzle-orm/node-postgres';
+import type { PgTransaction } from 'drizzle-orm/pg-core';
 import { Pool } from 'pg';
 import * as schema from './schema/index';
 
@@ -16,3 +19,12 @@ export function getDb() {
 }
 
 export type Database = ReturnType<typeof getDb>;
+
+/** Accepts both a top-level Database and a transaction handle. */
+export type DatabaseClient =
+  | Database
+  | PgTransaction<
+      NodePgQueryResultHKT,
+      typeof schema,
+      ExtractTablesWithRelations<typeof schema>
+    >;
