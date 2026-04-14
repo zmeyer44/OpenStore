@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import {
   blobLocations,
   fileBlobs,
@@ -200,6 +200,15 @@ export async function syncFileToStores(params: {
         errorMessage: `Source resolution failed: ${msg}`,
       });
       await db
+        .delete(blobLocations)
+        .where(
+          and(
+            eq(blobLocations.storeId, targetStore.id),
+            eq(blobLocations.storagePath, targetPath),
+            ne(blobLocations.blobId, file.blobId),
+          ),
+        );
+      await db
         .insert(blobLocations)
         .values({
           blobId: file.blobId,
@@ -289,6 +298,15 @@ export async function syncFileToStores(params: {
       });
 
       await db
+        .delete(blobLocations)
+        .where(
+          and(
+            eq(blobLocations.storeId, targetStore.id),
+            eq(blobLocations.storagePath, targetPath),
+            ne(blobLocations.blobId, file.blobId),
+          ),
+        );
+      await db
         .insert(blobLocations)
         .values({
           blobId: file.blobId,
@@ -331,6 +349,15 @@ export async function syncFileToStores(params: {
       if (stack) {
         console.error(`${tag}   ${stack.split("\n").slice(1, 4).join("\n  ")}`);
       }
+      await db
+        .delete(blobLocations)
+        .where(
+          and(
+            eq(blobLocations.storeId, targetStore.id),
+            eq(blobLocations.storagePath, targetPath),
+            ne(blobLocations.blobId, file.blobId),
+          ),
+        );
       await db
         .insert(blobLocations)
         .values({
