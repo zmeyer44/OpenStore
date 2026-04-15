@@ -79,10 +79,11 @@ export const uploadsRouter = createRouter({
         }
       }
 
-      // If replacing, delete the existing file first (frees storage quota)
+      // Find existing file if replacing (needed for quota calc and deletion)
+      let existingFileToReplace: { id: string; size: number } | null = null;
       if (input.conflictResolution === "replace") {
         const [existing] = await db
-          .select({ id: files.id })
+          .select({ id: files.id, size: files.size })
           .from(files)
           .where(
             and(
@@ -95,16 +96,13 @@ export const uploadsRouter = createRouter({
           .limit(1);
 
         if (existing) {
-          await deleteFileEverywhere({
-            db,
-            workspaceId,
-            fileId: existing.id,
-            deletedByUserId: userId,
-          });
+          existingFileToReplace = { id: existing.id, size: Number(existing.size) };
         }
       }
 
-      // Check storage quota (skipped for BYOB and self-hosted/local)
+      // Check storage quota (skipped for BYOB and self-hosted/local).
+      // For replace, subtract the existing file's size from the net increase
+      // so the quota check passes when swapping a file for a similar-sized one.
       if (await shouldEnforceQuota(workspaceId)) {
         const [ws] = await db
           .select({
@@ -114,15 +112,26 @@ export const uploadsRouter = createRouter({
           .from(workspaces)
           .where(eq(workspaces.id, workspaceId));
 
+        const netIncrease = input.fileSize - (existingFileToReplace?.size ?? 0);
         if (
           !ws ||
-          (ws.storageUsed ?? 0) + input.fileSize > (ws.storageLimit ?? 0)
+          (ws.storageUsed ?? 0) + netIncrease > (ws.storageLimit ?? 0)
         ) {
           throw new TRPCError({
             code: "PAYLOAD_TOO_LARGE",
             message: "Storage quota exceeded",
           });
         }
+      }
+
+      // Delete existing file only after quota check passes
+      if (existingFileToReplace) {
+        await deleteFileEverywhere({
+          db,
+          workspaceId,
+          fileId: existingFileToReplace.id,
+          deletedByUserId: userId,
+        });
       }
 
       const pending = await createPendingFileUpload({
