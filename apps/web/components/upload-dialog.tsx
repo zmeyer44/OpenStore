@@ -88,7 +88,7 @@ export function UploadDialog({
         setFiles((prev) =>
           prev.map((f) => {
             const match = conflictMap.get(f.file.name);
-            if (match && f.status === "pending") {
+            if (match && f.status === "pending" && !f.conflict) {
               return {
                 ...f,
                 conflict: {

@@ -19,8 +19,9 @@ import {
 import {
   createPendingFileUpload,
   markFileUploadReady,
+  finalizeReplace,
 } from "../../stores/file-records";
-import { runFileReadyHooks, deleteFileEverywhere } from "../../stores/lifecycle";
+import { runFileReadyHooks, cleanupFileExternalResources } from "../../stores/lifecycle";
 
 export const uploadsRouter = createRouter({
   getProvider: workspaceProcedure.query(async ({ ctx }) => {
@@ -236,33 +237,31 @@ export const uploadsRouter = createRouter({
         });
       }
 
-      // For replace: delete the old file now that the new upload has succeeded.
-      // Read replaceFileId from the file record (set during initiate) — never
-      // trust client input for which file to delete.
+      // For replace: atomically delete old file records + rename + mark ready
+      // in a single transaction to prevent stranded files on partial failure.
       if (file.replacesFileId) {
-        const [replacedFile] = await db
-          .select({ name: files.name })
-          .from(files)
-          .where(eq(files.id, file.replacesFileId))
-          .limit(1);
-
-        await deleteFileEverywhere({
+        const oldFile = await finalizeReplace({
           db,
           workspaceId,
-          fileId: file.replacesFileId,
-          deletedByUserId: ctx.userId,
+          newFileId: input.fileId,
+          replacedFileId: file.replacesFileId,
         });
 
-        // Restore the original display name (dedup gave the new file a temp name)
-        if (replacedFile) {
-          await db
-            .update(files)
-            .set({ name: replacedFile.name })
-            .where(eq(files.id, input.fileId));
+        // External cleanup (storage + indexes) after DB commit — best-effort
+        if (oldFile) {
+          void cleanupFileExternalResources({
+            db,
+            workspaceId,
+            fileId: oldFile.id,
+            blobId: oldFile.blobId,
+            storagePath: oldFile.storagePath,
+            deletedByUserId: ctx.userId,
+          }).catch(() => {});
         }
+      } else {
+        await markFileUploadReady({ db, fileId: input.fileId });
       }
 
-      await markFileUploadReady({ db, fileId: input.fileId });
       const [updated] = await db
         .select()
         .from(files)

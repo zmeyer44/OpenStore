@@ -167,6 +167,68 @@ async function deindexFile(params: {
   ]);
 }
 
+/**
+ * Best-effort cleanup of a file's external resources (storage objects and
+ * search indexes). Does NOT touch the database — call this after the DB
+ * records have already been deleted.
+ */
+export async function cleanupFileExternalResources(params: {
+  db: Database;
+  workspaceId: string;
+  fileId: string;
+  blobId: string;
+  storagePath: string;
+  deletedByUserId?: string;
+}) {
+  const locations = await params.db
+    .select({
+      storeId: blobLocations.storeId,
+      storagePath: blobLocations.storagePath,
+      writeMode: stores.writeMode,
+    })
+    .from(blobLocations)
+    .innerJoin(stores, eq(blobLocations.storeId, stores.id))
+    .where(eq(blobLocations.blobId, params.blobId));
+
+  if (locations.length === 0 && params.storagePath) {
+    try {
+      const primary = await getPrimaryStore(params.workspaceId);
+      await primary.storage.delete(params.storagePath);
+    } catch {
+      // best-effort
+    }
+  }
+
+  for (const location of locations) {
+    if (location.writeMode === "read_only") {
+      await params.db
+        .insert(ingestTombstones)
+        .values({
+          workspaceId: params.workspaceId,
+          storeId: location.storeId,
+          externalPath: location.storagePath,
+          deletedBlobId: params.blobId,
+          deletedByUserId: params.deletedByUserId ?? null,
+        })
+        .onConflictDoNothing();
+      continue;
+    }
+
+    try {
+      const { storage } = await getStoreById(location.storeId);
+      await storage.delete(location.storagePath);
+    } catch {
+      // best-effort
+    }
+  }
+
+  await deindexFile({
+    db: params.db,
+    workspaceId: params.workspaceId,
+    fileId: params.fileId,
+  });
+}
+
 export async function deleteFileEverywhere(params: {
   db: Database;
   workspaceId: string;

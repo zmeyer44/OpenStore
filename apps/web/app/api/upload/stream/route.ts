@@ -9,8 +9,8 @@ import {
 } from "../../../../server/storage";
 import { eq, and, sql } from "drizzle-orm";
 import { invalidateWorkspaceVfsSnapshot } from "../../../../server/vfs/locker-vfs";
-import { markFileUploadReady } from "../../../../server/stores/file-records";
-import { runFileReadyHooks, deleteFileEverywhere } from "../../../../server/stores/lifecycle";
+import { markFileUploadReady, finalizeReplace } from "../../../../server/stores/file-records";
+import { runFileReadyHooks, cleanupFileExternalResources } from "../../../../server/stores/lifecycle";
 
 export const runtime = "nodejs";
 
@@ -132,33 +132,31 @@ export async function PUT(req: NextRequest) {
       contentType,
     });
 
-    // For replace: delete the old file now that the new upload has succeeded.
-    // Read replacesFileId from the file record (set during initiate).
+    // For replace: atomically delete old file records + rename + mark ready
+    // in a single transaction to prevent stranded files on partial failure.
     if (fileRecord.replacesFileId) {
-      const [replacedFile] = await db
-        .select({ name: files.name })
-        .from(files)
-        .where(eq(files.id, fileRecord.replacesFileId))
-        .limit(1);
-
-      await deleteFileEverywhere({
+      const oldFile = await finalizeReplace({
         db,
         workspaceId: membership.workspaceId,
-        fileId: fileRecord.replacesFileId,
-        deletedByUserId: userId,
+        newFileId: fileId,
+        replacedFileId: fileRecord.replacesFileId,
       });
 
-      // Restore the original display name (dedup gave the new file a temp name)
-      if (replacedFile) {
-        await db
-          .update(files)
-          .set({ name: replacedFile.name })
-          .where(eq(files.id, fileId));
+      // External cleanup (storage + indexes) after DB commit — best-effort
+      if (oldFile) {
+        void cleanupFileExternalResources({
+          db,
+          workspaceId: membership.workspaceId,
+          fileId: oldFile.id,
+          blobId: oldFile.blobId,
+          storagePath: oldFile.storagePath,
+          deletedByUserId: userId,
+        }).catch(() => {});
       }
+    } else {
+      // Mark file as ready
+      await markFileUploadReady({ db, fileId });
     }
-
-    // Mark file as ready
-    await markFileUploadReady({ db, fileId });
 
     // Update storage usage
     await db
