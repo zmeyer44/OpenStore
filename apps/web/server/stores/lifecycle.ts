@@ -167,20 +167,21 @@ async function deindexFile(params: {
   ]);
 }
 
-/**
- * Best-effort cleanup of a file's external resources (storage objects and
- * search indexes). Does NOT touch the database — call this after the DB
- * records have already been deleted.
- */
-export async function cleanupFileExternalResources(params: {
-  db: Database;
-  workspaceId: string;
-  fileId: string;
-  blobId: string;
+export type BlobLocationInfo = {
+  storeId: string;
   storagePath: string;
-  deletedByUserId?: string;
-}) {
-  const locations = await params.db
+  writeMode: string;
+};
+
+/**
+ * Read blob locations for a file. Call this BEFORE deleting DB records,
+ * since cascade deletes will remove blobLocations rows.
+ */
+export async function readBlobLocations(
+  db: Database,
+  blobId: string,
+): Promise<BlobLocationInfo[]> {
+  return db
     .select({
       storeId: blobLocations.storeId,
       storagePath: blobLocations.storagePath,
@@ -188,7 +189,27 @@ export async function cleanupFileExternalResources(params: {
     })
     .from(blobLocations)
     .innerJoin(stores, eq(blobLocations.storeId, stores.id))
-    .where(eq(blobLocations.blobId, params.blobId));
+    .where(eq(blobLocations.blobId, blobId));
+}
+
+/**
+ * Best-effort cleanup of a file's external resources (storage objects and
+ * search indexes). Does NOT touch the database — call this after the DB
+ * records have already been deleted.
+ *
+ * `locations` must be fetched BEFORE the DB records are deleted (cascade
+ * from fileBlobs removes blobLocations rows).
+ */
+export async function cleanupFileExternalResources(params: {
+  db: Database;
+  workspaceId: string;
+  fileId: string;
+  blobId: string;
+  storagePath: string;
+  locations: BlobLocationInfo[];
+  deletedByUserId?: string;
+}) {
+  const { locations } = params;
 
   if (locations.length === 0 && params.storagePath) {
     try {

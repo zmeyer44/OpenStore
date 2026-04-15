@@ -247,7 +247,8 @@ export const uploadsRouter = createRouter({
           replacedFileId: file.replacesFileId,
         });
 
-        // External cleanup (storage + indexes) after DB commit — best-effort
+        // External cleanup (storage + indexes) after DB commit — best-effort.
+        // Locations were read before the transaction (cascade deletes them).
         if (oldFile) {
           void cleanupFileExternalResources({
             db,
@@ -255,6 +256,7 @@ export const uploadsRouter = createRouter({
             fileId: oldFile.id,
             blobId: oldFile.blobId,
             storagePath: oldFile.storagePath,
+            locations: oldFile.locations,
             deletedByUserId: ctx.userId,
           }).catch(() => {});
         }

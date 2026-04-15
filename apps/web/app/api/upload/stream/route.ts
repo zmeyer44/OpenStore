@@ -142,7 +142,8 @@ export async function PUT(req: NextRequest) {
         replacedFileId: fileRecord.replacesFileId,
       });
 
-      // External cleanup (storage + indexes) after DB commit — best-effort
+      // External cleanup (storage + indexes) after DB commit — best-effort.
+      // Locations were read before the transaction (cascade deletes them).
       if (oldFile) {
         void cleanupFileExternalResources({
           db,
@@ -150,6 +151,7 @@ export async function PUT(req: NextRequest) {
           fileId: oldFile.id,
           blobId: oldFile.blobId,
           storagePath: oldFile.storagePath,
+          locations: oldFile.locations,
           deletedByUserId: userId,
         }).catch(() => {});
       }

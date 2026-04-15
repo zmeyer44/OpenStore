@@ -14,6 +14,7 @@ import {
   deduplicateObjectKey,
 } from "@locker/jobs";
 import { createStorageForWorkspace } from "../storage";
+import { readBlobLocations, type BlobLocationInfo } from "./lifecycle";
 
 export async function createPendingFileUpload(params: {
   db: Database;
@@ -208,6 +209,10 @@ export async function finalizeReplace(params: {
     return null;
   }
 
+  // Read blob locations BEFORE the transaction — cascade from deleting
+  // fileBlobs will remove these rows, so they must be captured now.
+  const oldLocations = await readBlobLocations(db, oldFile.blobId);
+
   const now = new Date();
 
   await db.transaction(async (tx) => {
@@ -239,8 +244,8 @@ export async function finalizeReplace(params: {
       .where(eq(blobLocations.blobId, newFile.blobId));
   });
 
-  // Return old file info for external cleanup (storage + index)
-  return oldFile;
+  // Return old file info + pre-fetched locations for external cleanup
+  return { ...oldFile, locations: oldLocations };
 }
 
 export async function markBlobLocationFailed(params: {
