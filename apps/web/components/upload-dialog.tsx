@@ -25,6 +25,13 @@ import {
 } from "@/components/ui/dialog";
 import { MAX_FILE_SIZE } from "@locker/common";
 
+function deduplicateName(name: string): string {
+  const dotIndex = name.lastIndexOf(".");
+  const stem = dotIndex > 0 ? name.slice(0, dotIndex) : name;
+  const ext = dotIndex > 0 ? name.slice(dotIndex) : "";
+  return `${stem} (1)${ext}`;
+}
+
 interface FileConflict {
   existingFileId: string;
   existingFileSize: number;
@@ -365,7 +372,9 @@ export function UploadDialog({
                       className="size-3.5 shrink-0"
                     />
                     <span className="text-xs truncate flex-1">
-                      {entry.file.name}
+                      {entry.conflict?.resolution === "keep-both"
+                        ? deduplicateName(entry.file.name)
+                        : entry.file.name}
                     </span>
                     <span className="text-xs font-mono text-muted-foreground shrink-0">
                       {formatBytes(entry.file.size)}
@@ -418,7 +427,7 @@ export function UploadDialog({
                           <span className="text-xs text-muted-foreground">
                             {entry.conflict.resolution === "replace"
                               ? "Will replace existing"
-                              : "Will keep both"}
+                              : `Will save as "${deduplicateName(entry.file.name)}"`}
                           </span>
                         )}
                       </div>
