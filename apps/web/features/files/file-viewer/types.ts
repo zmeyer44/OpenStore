@@ -6,5 +6,6 @@ export type ViewerType =
   | "docx"
   | "markdown"
   | "csv"
+  | "html"
   | "text"
   | "unsupported";

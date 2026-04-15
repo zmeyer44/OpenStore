@@ -152,7 +152,7 @@ export function FileViewer({ fileId }: { fileId: string }) {
         setPreviewUrl(result.url);
 
         const vt = getViewerType(file.mimeType, file.name);
-        if (vt === "text" || vt === "markdown" || vt === "csv") {
+        if (vt === "text" || vt === "markdown" || vt === "csv" || vt === "html") {
           fetch(result.url)
             .then((r) => r.text())
             .then((text) => {
