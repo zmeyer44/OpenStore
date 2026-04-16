@@ -138,7 +138,8 @@ export default function AppearancePage() {
       setMenuColor(c.menuColor);
       setMenuAccent(c.menuAccent);
     }
-  }, [data?.themeConfig]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- compare by value, not reference
+  }, [JSON.stringify(data?.themeConfig)]);
 
   const currentConfig: WorkspaceThemeConfig = useMemo(
     () => ({ baseColor, accentColor, radius, chartColor, bodyFont, headingFont, menuColor, menuAccent }),
