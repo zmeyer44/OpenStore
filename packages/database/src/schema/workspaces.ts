@@ -5,6 +5,7 @@ import {
   uuid,
   varchar,
   bigint,
+  jsonb,
   uniqueIndex,
   index,
 } from 'drizzle-orm/pg-core';
@@ -26,6 +27,16 @@ export const workspaces = pgTable(
     storageLimit: bigint('storage_limit', { mode: 'number' })
       .notNull()
       .default(5368709120), // 5GB
+    themeConfig: jsonb('theme_config').$type<{
+      baseColor: string;
+      accentColor: string;
+      radius: string;
+      chartColor: string;
+      bodyFont: string;
+      headingFont: string;
+      menuColor: string;
+      menuAccent: string;
+    }>(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },

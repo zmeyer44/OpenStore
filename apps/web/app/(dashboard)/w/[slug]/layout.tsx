@@ -5,6 +5,7 @@ import { getDb } from "@locker/database/client";
 import { workspaces, workspaceMembers } from "@locker/database";
 import { eq, and } from "drizzle-orm";
 import { WorkspaceProvider } from "@/lib/workspace-context";
+import { WorkspaceThemeStyle } from "@/components/workspace-theme-provider";
 import { KBAnnouncementModal } from "@/components/kb-announcement-modal";
 
 export default async function WorkspaceLayout({
@@ -28,6 +29,7 @@ export default async function WorkspaceLayout({
       name: workspaces.name,
       slug: workspaces.slug,
       role: workspaceMembers.role,
+      themeConfig: workspaces.themeConfig,
     })
     .from(workspaceMembers)
     .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
@@ -51,6 +53,7 @@ export default async function WorkspaceLayout({
         role: membership.role,
       }}
     >
+      <WorkspaceThemeStyle themeConfig={membership.themeConfig} />
       {children}
       <KBAnnouncementModal />
     </WorkspaceProvider>

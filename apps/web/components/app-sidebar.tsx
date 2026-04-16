@@ -25,6 +25,7 @@ import {
   Boxes,
   Bell,
   HardDrive,
+  Palette,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/assets/logo";
@@ -411,6 +412,12 @@ function WorkspaceNav({
       label: "Members",
       icon: Users,
       key: "members",
+    },
+    {
+      href: `${prefix}/settings/appearance`,
+      label: "Appearance",
+      icon: Palette,
+      key: "appearance",
     },
     {
       href: `${prefix}/settings/api-keys`,

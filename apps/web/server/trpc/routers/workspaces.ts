@@ -50,6 +50,7 @@ export const workspacesRouter = createRouter({
           ownerId: workspaces.ownerId,
           storageUsed: workspaces.storageUsed,
           storageLimit: workspaces.storageLimit,
+          themeConfig: workspaces.themeConfig,
           role: workspaceMembers.role,
           createdAt: workspaces.createdAt,
         })
@@ -144,6 +145,7 @@ export const workspacesRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       const updates: Record<string, unknown> = { updatedAt: new Date() };
       if (input.name) updates.name = input.name;
+      if (input.themeConfig) updates.themeConfig = input.themeConfig;
 
       if (input.slug) {
         // Ensure unique slug
