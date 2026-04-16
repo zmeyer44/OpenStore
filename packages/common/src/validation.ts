@@ -108,6 +108,17 @@ export const createWorkspaceSchema = z.object({
   name: z.string().min(1).max(100).trim(),
 });
 
+export const workspaceThemeConfigSchema = z.object({
+  baseColor: z.string().min(1).max(50),
+  accentColor: z.string().min(1).max(50),
+  radius: z.string().min(1).max(50),
+  chartColor: z.string().min(1).max(50),
+  bodyFont: z.string().min(1).max(50),
+  headingFont: z.string().min(1).max(50),
+  menuColor: z.string().min(1).max(50),
+  menuAccent: z.string().min(1).max(50),
+});
+
 export const updateWorkspaceSchema = z.object({
   name: z.string().min(1).max(100).trim().optional(),
   slug: z
@@ -119,6 +130,7 @@ export const updateWorkspaceSchema = z.object({
       "Slug must be lowercase letters, numbers, and hyphens",
     )
     .optional(),
+  themeConfig: workspaceThemeConfigSchema.optional(),
 });
 
 export const inviteMemberSchema = z.object({

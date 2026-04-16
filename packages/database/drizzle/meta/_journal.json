@@ -141,6 +141,13 @@
       "when": 1776412800000,
       "tag": "0019_file_name_uniqueness",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1776672000000,
+      "tag": "0020_workspace_theme_config",
+      "breakpoints": true
     }
   ]
 }
