@@ -1,7 +1,7 @@
 import { defineContentScript } from "wxt/utils/define-content-script";
 import { createRoot, type Root } from "react-dom/client";
 import { StrictMode, useState } from "react";
-import { X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import { FileBrowser } from "../../components/FileBrowser";
 import { GenerateView } from "../../components/GenerateView";
 import { Logo } from "../../components/Logo";
@@ -237,26 +237,29 @@ function Dialog({
         {error ? <div style={errorBox}>{error}</div> : null}
 
         {view === "choose" ? (
-          <div style={chooseGrid}>
-            <button style={choiceBtn} onClick={() => setView("locker")}>
-              <span style={choiceTitle}>From Locker</span>
-              <span style={choiceSub}>
-                {signedIn
-                  ? "Pick a file from your workspace"
-                  : "Sign in to your Locker account"}
-              </span>
+          <>
+            <div style={chooseGrid}>
+              <button style={choiceBtn} onClick={() => setView("locker")}>
+                <span style={choiceTitle}>From Locker</span>
+                <span style={choiceSub}>
+                  {signedIn
+                    ? "Pick a file from your workspace"
+                    : "Sign in to your Locker account"}
+                </span>
+              </button>
+              <button style={choiceBtn} onClick={onUseComputer}>
+                <span style={choiceTitle}>From Computer</span>
+                <span style={choiceSub}>Open the standard file picker</span>
+              </button>
+            </div>
+            <button
+              style={generateChoiceBtn}
+              onClick={() => setView("generate")}
+            >
+              <Sparkles size={14} />
+              Generate with AI
             </button>
-            <button style={choiceBtn} onClick={onUseComputer}>
-              <span style={choiceTitle}>From Computer</span>
-              <span style={choiceSub}>Open the standard file picker</span>
-            </button>
-            <button style={choiceBtn} onClick={() => setView("generate")}>
-              <span style={choiceTitle}>Generate with AI</span>
-              <span style={choiceSub}>
-                Describe what you need and we'll create it
-              </span>
-            </button>
-          </div>
+          </>
         ) : view === "locker" ? (
           signedIn ? (
             <FileBrowser
@@ -393,8 +396,8 @@ const closeBtn: React.CSSProperties = {
 
 const chooseGrid: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(3, 1fr)",
-  gap: 8,
+  gridTemplateColumns: "1fr 1fr",
+  gap: 10,
 };
 
 const choiceBtn: React.CSSProperties = {
@@ -402,7 +405,7 @@ const choiceBtn: React.CSSProperties = {
   flexDirection: "column",
   alignItems: "flex-start",
   gap: 4,
-  padding: "12px 12px",
+  padding: "14px 14px",
   background: "#fff",
   border: "1px solid rgba(20, 17, 15, 0.10)",
   borderRadius: 12,
@@ -410,14 +413,26 @@ const choiceBtn: React.CSSProperties = {
   textAlign: "left",
   fontFamily: "inherit",
   color: "#14110f",
-  minHeight: 76,
 };
 
-const choiceTitle: React.CSSProperties = { fontWeight: 600, fontSize: 13.5 };
-const choiceSub: React.CSSProperties = {
-  color: "#5a554f",
-  fontSize: 11.5,
-  lineHeight: 1.35,
+const choiceTitle: React.CSSProperties = { fontWeight: 600, fontSize: 14 };
+const choiceSub: React.CSSProperties = { color: "#5a554f", fontSize: 12 };
+
+const generateChoiceBtn: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  width: "100%",
+  padding: "10px 14px",
+  background: "#3a62f5",
+  color: "#fff",
+  border: "none",
+  borderRadius: 12,
+  cursor: "pointer",
+  fontSize: 14,
+  fontWeight: 600,
+  fontFamily: "inherit",
 };
 
 const primaryBtn: React.CSSProperties = {

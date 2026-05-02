@@ -59,7 +59,7 @@ const bodySchema = z.object({
   // Files the user picked from their Locker workspace. Looked up server-side
   // and read straight from storage so we don't round-trip the bytes through
   // the extension.
-  lockerFileIds: z.array(z.string().uuid()).max(8).optional(),
+  lockerFileIds: z.array(z.uuid()).max(8).optional(),
 });
 
 function decodeBase64(b64: string): Buffer {
