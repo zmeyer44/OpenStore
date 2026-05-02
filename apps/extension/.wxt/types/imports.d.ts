@@ -4,6 +4,7 @@ declare global {
   const ContentScriptContext: typeof import('wxt/utils/content-script-context').ContentScriptContext
   const FileBrowser: typeof import('/Users/claudius/openstore/apps/extension/components/FileBrowser').FileBrowser
   const InvalidMatchPattern: typeof import('wxt/utils/match-patterns').InvalidMatchPattern
+  const Logo: typeof import('/Users/claudius/openstore/apps/extension/components/Logo').Logo
   const MatchPattern: typeof import('wxt/utils/match-patterns').MatchPattern
   const Select: typeof import('/Users/claudius/openstore/apps/extension/components/Select').Select
   const TrpcError: typeof import('/Users/claudius/openstore/apps/extension/utils/api').TrpcError

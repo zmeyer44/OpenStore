@@ -8,6 +8,12 @@ declare module "wxt/browser" {
     | "/auth-complete.html"
     | "/background.js"
     | "/content-scripts/filepicker.js"
+    | "/icon/128.png"
+    | "/icon/16.png"
+    | "/icon/32.png"
+    | "/icon/48.png"
+    | "/icon/96.png"
+    | "/icon/source.svg"
     | "/popup.html"
   type HtmlPublicPath = Extract<PublicPath, `${string}.html`>
   export interface WxtRuntime {

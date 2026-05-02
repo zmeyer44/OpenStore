@@ -19,6 +19,7 @@ declare module '#imports' {
   export { useState, useCallback, useMemo, useEffect, useRef, useContext, useReducer } from 'react';
   export { fakeBrowser } from 'wxt/testing';
   export { FileBrowser, FileBrowserProps } from '../components/FileBrowser';
+  export { Logo } from '../components/Logo';
   export { Select, SelectOption, SelectProps } from '../components/Select';
   export { TrpcError, trpcQuery, trpcMutation, probeSession, downloadAsBlob, blobToBase64 } from '../utils/api';
   export { sendMessage, onMessage, Workspace, FolderRow, FileRow, Breadcrumb, ApiResult } from '../utils/messaging';

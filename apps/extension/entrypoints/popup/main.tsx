@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { sendMessage } from "../../utils/messaging";
 import { webHost } from "../../utils/web-host";
 import { FileBrowser } from "../../components/FileBrowser";
+import { Logo } from "../../components/Logo";
 
 function Popup() {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
@@ -78,7 +79,7 @@ function Popup() {
 function Header() {
   return (
     <div style={styles.header}>
-      <span style={styles.logoDot} />
+      <Logo style={styles.logoMark} aria-hidden="true" />
       <span style={styles.logo}>Locker</span>
     </div>
   );
@@ -92,13 +93,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
   },
   header: { display: "flex", alignItems: "center", gap: 8 },
-  logoDot: {
-    display: "inline-block",
-    width: 12,
-    height: 12,
-    borderRadius: 3,
-    background: "#3a62f5",
-  },
+  logoMark: { width: 22, height: 22, color: "#3a62f5", flex: "0 0 auto" },
   logo: { fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em" },
   body: { color: "#5a554f", lineHeight: 1.5, margin: 0, fontSize: 13.5 },
   primaryButton: {

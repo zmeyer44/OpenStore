@@ -3,6 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { StrictMode, useState } from "react";
 import { X } from "lucide-react";
 import { FileBrowser } from "../../components/FileBrowser";
+import { Logo } from "../../components/Logo";
 import { sendMessage, type FileRow } from "../../utils/messaging";
 import { isSignedIn } from "../../utils/storage";
 
@@ -195,7 +196,12 @@ function Dialog({
     <div style={overlay} onClick={onClose}>
       <div style={panel} onClick={(e) => e.stopPropagation()}>
         <div style={panelHeader}>
-          <span style={{ fontWeight: 700 }}>Choose a file</span>
+          <span style={brandRow}>
+            <Logo style={brandLogo} aria-hidden="true" />
+            <span style={brandLabel}>Locker</span>
+            <span style={brandSep}>·</span>
+            <span style={brandTitle}>Choose a file</span>
+          </span>
           <button style={closeBtn} onClick={onClose} aria-label="Close">
             <X size={16} />
           </button>
@@ -288,6 +294,42 @@ const panelHeader: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "space-between",
   fontSize: 14,
+  gap: 8,
+};
+
+const brandRow: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  minWidth: 0,
+};
+
+const brandLogo: React.CSSProperties = {
+  width: 20,
+  height: 20,
+  color: "#3a62f5",
+  flex: "0 0 auto",
+};
+
+const brandLabel: React.CSSProperties = {
+  fontWeight: 700,
+  fontSize: 14,
+  letterSpacing: "-0.01em",
+  color: "#14110f",
+};
+
+const brandSep: React.CSSProperties = {
+  color: "#9e9890",
+  fontSize: 14,
+};
+
+const brandTitle: React.CSSProperties = {
+  color: "#5a554f",
+  fontSize: 13.5,
+  fontWeight: 500,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 };
 
 const closeBtn: React.CSSProperties = {
