@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Locker",
+  "description": "Pick files from your Locker workspace anywhere on the web.",
+  "version": "0.1.0",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "http://localhost/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Locker"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "auth-complete.html"
+      ],
+      "matches": [
+        "http://localhost:3000/*",
+        "http://localhost:3000/*"
+      ]
+    }
+  ],
+  "commands": {
+    "wxt:reload-extension": {
+      "description": "Reload the extension during development",
+      "suggested_key": {
+        "default": "Alt+R"
+      }
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval' http://localhost:3101; object-src 'self';",
+    "sandbox": "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:3101; sandbox allow-scripts allow-forms allow-popups allow-modals; child-src 'self';"
+  }
+}

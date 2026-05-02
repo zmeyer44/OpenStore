@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Locker — signed in</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        margin: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        background: #f7f7f5;
+        color: #14110f;
+      }
+      .brand {
+        font-weight: 700;
+        font-size: 18px;
+        letter-spacing: -0.01em;
+      }
+      #status {
+        font-size: 14px;
+        color: #5a554f;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="brand">Locker</div>
+    <div id="status">Completing sign-in…</div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

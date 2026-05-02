@@ -54,16 +54,14 @@ export const filesRouter = createRouter({
         tagSlugs: z.array(z.string()).optional(),
         fileTypes: z
           .array(
-            z.enum([
-              "image",
-              "document",
-              "video",
-              "audio",
-              "archive",
-              "other",
-            ]),
+            z.enum(["image", "document", "video", "audio", "archive", "other"]),
           )
           .optional(),
+        // HTML5 input accept tokens — MIME types ("image/png"), MIME
+        // wildcards ("image/*"), or file extensions (".pdf"). Used by the
+        // browser extension's file-input intercept to scope the picker to
+        // the type the page asked for.
+        accept: z.array(z.string()).optional(),
         createdAfter: z.string().date().optional(),
         createdBefore: z.string().date().optional(),
         ...paginationSchema.shape,
@@ -77,6 +75,7 @@ export const filesRouter = createRouter({
         search,
         tagSlugs,
         fileTypes,
+        accept,
         createdAfter,
         createdBefore,
         page,
@@ -197,7 +196,10 @@ export const filesRouter = createRouter({
             frontier = childIds;
           }
           conditions.push(
-            or(isNull(files.folderId), not(inArray(files.folderId, allHiddenIds)))!,
+            or(
+              isNull(files.folderId),
+              not(inArray(files.folderId, allHiddenIds)),
+            )!,
           );
         }
       } else {
@@ -269,6 +271,47 @@ export const filesRouter = createRouter({
           conditions.push(inArray(files.mimeType, mimeTypes));
         } else if (includeOther) {
           conditions.push(not(inArray(files.mimeType, allKnownMimeTypes)));
+        }
+      }
+
+      // HTML5 accept filter — OR across tokens. MIME wildcards become
+      // case-insensitive prefix matches against mimeType, exact MIME types
+      // become equality matches, and ".ext" tokens become case-insensitive
+      // suffix matches against the file name. We escape `%`/`_`/`\` from
+      // user-provided fragments so a stray underscore in an extension
+      // doesn't become a wildcard.
+      if (accept && accept.length > 0) {
+        const orParts = [];
+        let allowAll = false;
+        for (const raw of accept) {
+          const token = raw.trim().toLowerCase();
+          if (!token) continue;
+          if (token === "*/*" || token === "*") {
+            allowAll = true;
+            break;
+          }
+          const escapeLike = (s: string) =>
+            s.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+          if (token.includes("/")) {
+            if (token.endsWith("/*")) {
+              const prefix = token.slice(0, -1); // "image/"
+              orParts.push(ilike(files.mimeType, `${escapeLike(prefix)}%`));
+            } else {
+              orParts.push(ilike(files.mimeType, escapeLike(token)));
+            }
+          } else if (token.startsWith(".") && token.length > 1) {
+            orParts.push(ilike(files.name, `%${escapeLike(token)}`));
+          }
+          // Anything else (bare extensions without a dot, etc.) is ignored;
+          // HTML5 doesn't define those.
+        }
+        if (!allowAll && orParts.length > 0) {
+          conditions.push(or(...orParts)!);
+        } else if (!allowAll && orParts.length === 0) {
+          // Caller passed an accept array that yielded no usable tokens
+          // (e.g. all malformed). Return zero results rather than silently
+          // ignoring the filter — the page asked for a type we can't match.
+          conditions.push(sql`false`);
         }
       }
 
