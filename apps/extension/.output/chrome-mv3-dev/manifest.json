@@ -31,8 +31,8 @@
         "auth-complete.html"
       ],
       "matches": [
-        "http://localhost:3000/*",
-        "https://locker.dev/*"
+        "https://locker.dev/*",
+        "http://localhost:3000/*"
       ]
     }
   ],
