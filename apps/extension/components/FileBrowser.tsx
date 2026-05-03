@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ChevronRight,
   Folder,
@@ -24,7 +24,9 @@ export interface FileBrowserProps {
   // the file-input intercept dialog needs to commit a selection back to the
   // page.
   mode: "browse" | "pick";
-  onPickFile?: (file: FileRow, workspaceSlug: string) => void;
+  // May be async — the dialog's pick handler runs a fetchFileForUpload
+  // round-trip and we await it to keep the row's loading state honest.
+  onPickFile?: (file: FileRow, workspaceSlug: string) => void | Promise<void>;
   onClose?: () => void;
   // Allow the host (popup) to render in a tighter box than the dialog.
   height?: number;
@@ -69,6 +71,11 @@ export function FileBrowser({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [picking, setPicking] = useState<string | null>(null);
+  // Synchronous mirror of `picking` for the moment between the click handler
+  // setting state and React committing — without it, a hard double-click can
+  // fire two handlePick calls before the disabled prop takes effect, and
+  // both injections race into the same <input>.
+  const pickingRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,10 +146,16 @@ export function FileBrowser({
 
   const handlePick = async (file: FileRow) => {
     if (!activeSlug || !onPickFile) return;
+    if (pickingRef.current) return;
+    pickingRef.current = file.id;
     setPicking(file.id);
     try {
-      onPickFile(file, activeSlug);
+      // Awaited so the in-flight state survives across the
+      // fetchFileForUpload round-trip; without await the finally clears
+      // `picking` synchronously and a second click would race the first.
+      await onPickFile(file, activeSlug);
     } finally {
+      pickingRef.current = null;
       setPicking(null);
     }
   };
@@ -226,7 +239,9 @@ export function FileBrowser({
                   <button
                     style={styles.pickBtn}
                     onClick={() => handlePick(f)}
-                    disabled={picking === f.id}
+                    // Lock every Use button while any pick is in flight —
+                    // injecting a second file would clobber the first.
+                    disabled={picking !== null}
                   >
                     {picking === f.id ? "…" : "Use"}
                   </button>
