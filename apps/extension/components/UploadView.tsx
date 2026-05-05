@@ -91,6 +91,18 @@ export function UploadView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Defense-in-depth: if the popup tears the view down while an upload is
+  // running (e.g. parent re-render, popup window closing on focus loss), abort
+  // the controller so the in-flight XHRs don't keep transferring against a
+  // dead component. The Back button is also disabled while uploading, so the
+  // common path can't reach this — but extension popups can also be killed
+  // out from under us.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
   const addFiles = (files: File[]) => {
     if (files.length === 0) return;
     const accepted: Entry[] = [];
@@ -317,7 +329,13 @@ export function UploadView({
   return (
     <div style={styles.root}>
       <div style={styles.headerRow}>
-        <button style={styles.backBtn} onClick={onClose} aria-label="Back">
+        <button
+          style={uploading ? styles.backBtnDisabled : styles.backBtn}
+          onClick={onClose}
+          aria-label="Back"
+          disabled={uploading}
+          title={uploading ? "Cancel the upload first" : "Back"}
+        >
           <ArrowLeft size={16} />
         </button>
         <span style={styles.title}>Upload</span>
@@ -532,6 +550,20 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 9999,
     cursor: "pointer",
     color: "#5a554f",
+    fontFamily: "inherit",
+  },
+  backBtnDisabled: {
+    width: 36,
+    height: 36,
+    flex: "0 0 auto",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(20, 17, 15, 0.045)",
+    border: "1px solid transparent",
+    borderRadius: 9999,
+    cursor: "not-allowed",
+    color: "#c4bfb8",
     fontFamily: "inherit",
   },
   title: {
