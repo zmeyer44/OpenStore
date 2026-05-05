@@ -19,14 +19,16 @@ declare module '#imports' {
   export { useState, useCallback, useMemo, useEffect, useRef, useContext, useReducer } from 'react';
   export { fakeBrowser } from 'wxt/testing';
   export { default as DrawCanvas } from '../components/DrawCanvas';
+  export { DropOverlay } from '../components/DropOverlay';
   export { FileBrowser, FileBrowserProps } from '../components/FileBrowser';
   export { GenerateView } from '../components/GenerateView';
   export { Logo } from '../components/Logo';
   export { Select, SelectOption, SelectProps } from '../components/Select';
-  export { TrpcError, trpcQuery, trpcMutation, probeSession, downloadAsBlob, blobToBase64 } from '../utils/api';
+  export { UploadView } from '../components/UploadView';
+  export { TrpcError, trpcQuery, trpcMutation, probeSession, downloadAsBlob, blobToBase64, UPLOAD_MAX_FILE_SIZE, UPLOAD_MULTIPART_PART_SIZE, uploadPresignedPut, uploadServerBuffered, uploadMultipart, UploadProgress, MultipartPart } from '../utils/api';
   export { PRIVACY_POLICY_URL } from '../utils/constants';
   export { default as cssInlineD } from '../utils/css-inline.d';
-  export { sendMessage, onMessage, Workspace, FolderRow, FileRow, Breadcrumb, ApiResult, GenerationTypeRow } from '../utils/messaging';
+  export { sendMessage, onMessage, Workspace, FolderRow, FileRow, Breadcrumb, ApiResult, InitiateUploadResponse, GenerationTypeRow } from '../utils/messaging';
   export { signedInStore, activeWorkspaceSlugStore, isSignedIn, setSignedIn, getActiveWorkspaceSlug, setActiveWorkspaceSlug } from '../utils/storage';
   export { webHost } from '../utils/web-host';
 }

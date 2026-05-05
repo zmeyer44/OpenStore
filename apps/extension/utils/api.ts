@@ -125,3 +125,214 @@ export async function blobToBase64(blob: Blob): Promise<string> {
   }
   return btoa(binary);
 }
+
+// ── Upload helpers ──────────────────────────────────────────────────────────
+// These run in the popup (a privileged extension context). XHR is used over
+// fetch so we get upload progress events. Cookies ride along on the streaming
+// endpoint thanks to host_permissions; presigned S3 URLs are signed and need
+// no credentials.
+
+// Mirrors @locker/common — kept inline so the extension package doesn't pull
+// in the workspace's TS server deps (zod, drizzle, ...). Server-side validation
+// is the source of truth; the popup only uses these for client-side gating.
+export const UPLOAD_MAX_FILE_SIZE = 100 * 1024 * 1024;
+export const UPLOAD_MULTIPART_PART_SIZE = 10 * 1024 * 1024;
+const UPLOAD_MULTIPART_MAX_CONCURRENCY = 4;
+
+export interface UploadProgress {
+  loaded: number;
+  total: number;
+  percentage: number;
+}
+
+export async function uploadPresignedPut(
+  file: File,
+  presignedUrl: string,
+  onProgress?: (p: UploadProgress) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress({
+          loaded: e.loaded,
+          total: e.total,
+          percentage: Math.round((e.loaded / e.total) * 100),
+        });
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`Upload failed: ${xhr.status}`));
+    };
+    xhr.onerror = () => reject(new Error("Network error"));
+    if (signal) signal.addEventListener("abort", () => xhr.abort());
+    xhr.open("PUT", presignedUrl);
+    xhr.setRequestHeader(
+      "Content-Type",
+      file.type || "application/octet-stream",
+    );
+    xhr.send(file);
+  });
+}
+
+export async function uploadServerBuffered(
+  file: File,
+  workspaceSlug: string,
+  fileId: string,
+  onProgress?: (p: UploadProgress) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress({
+          loaded: e.loaded,
+          total: e.total,
+          percentage: Math.round((e.loaded / e.total) * 100),
+        });
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+      } else {
+        try {
+          const data = JSON.parse(xhr.responseText) as { error?: string };
+          reject(new Error(data.error ?? `Upload failed: ${xhr.status}`));
+        } catch {
+          reject(new Error(`Upload failed: ${xhr.status}`));
+        }
+      }
+    };
+    xhr.onerror = () => reject(new Error("Network error"));
+    xhr.withCredentials = true;
+    if (signal) signal.addEventListener("abort", () => xhr.abort());
+    xhr.open("PUT", `${webHost()}/api/upload/stream`);
+    xhr.setRequestHeader("x-workspace-slug", workspaceSlug);
+    xhr.setRequestHeader("x-file-id", fileId);
+    xhr.setRequestHeader(
+      "Content-Type",
+      file.type || "application/octet-stream",
+    );
+    xhr.send(file);
+  });
+}
+
+export interface MultipartPart {
+  partNumber: number;
+  url: string;
+}
+
+export async function uploadMultipart(
+  file: File,
+  parts: MultipartPart[],
+  partSize: number,
+  onProgress?: (p: UploadProgress) => void,
+  signal?: AbortSignal,
+): Promise<{ partNumber: number; etag: string }[]> {
+  const partLoaded = new Map<number, number>();
+  const reportProgress = () => {
+    if (!onProgress) return;
+    let loaded = 0;
+    partLoaded.forEach((v) => (loaded += v));
+    onProgress({
+      loaded,
+      total: file.size,
+      percentage: Math.round((loaded / file.size) * 100),
+    });
+  };
+
+  const slices = parts.map((part) => {
+    const start = (part.partNumber - 1) * partSize;
+    const end = Math.min(start + partSize, file.size);
+    return { ...part, blob: file.slice(start, end) };
+  });
+
+  const results: { partNumber: number; etag: string }[] = [];
+  const executing = new Set<Promise<void>>();
+
+  for (const part of slices) {
+    if (signal?.aborted) {
+      throw new DOMException("Upload cancelled", "AbortError");
+    }
+    const task: Promise<void> = uploadSinglePart(
+      part,
+      (loaded) => {
+        partLoaded.set(part.partNumber, loaded);
+        reportProgress();
+      },
+      signal,
+    )
+      .then((result) => {
+        results.push(result);
+      })
+      .finally(() => {
+        executing.delete(task);
+      });
+    executing.add(task);
+    if (executing.size >= UPLOAD_MULTIPART_MAX_CONCURRENCY) {
+      await Promise.race(executing);
+    }
+  }
+
+  await Promise.all(executing);
+  return results;
+}
+
+async function uploadSinglePart(
+  part: { partNumber: number; url: string; blob: Blob },
+  onPartProgress: (loaded: number) => void,
+  signal?: AbortSignal,
+  maxRetries = 3,
+): Promise<{ partNumber: number; etag: string }> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await doPartUpload(part, onPartProgress, signal);
+    } catch (err) {
+      if (signal?.aborted) throw err;
+      if (attempt === maxRetries) throw err;
+      // Exponential backoff between retries.
+      await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+    }
+  }
+  throw new Error("unreachable");
+}
+
+function doPartUpload(
+  part: { partNumber: number; url: string; blob: Blob },
+  onProgress: (loaded: number) => void,
+  signal?: AbortSignal,
+): Promise<{ partNumber: number; etag: string }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const etag = xhr.getResponseHeader("ETag");
+        if (!etag) {
+          return reject(
+            new Error(`No ETag in response for part ${part.partNumber}`),
+          );
+        }
+        resolve({
+          partNumber: part.partNumber,
+          etag: etag.replace(/"/g, ""),
+        });
+      } else {
+        reject(
+          new Error(`Part ${part.partNumber} upload failed: ${xhr.status}`),
+        );
+      }
+    };
+    xhr.onerror = () =>
+      reject(new Error(`Network error on part ${part.partNumber}`));
+    if (signal) signal.addEventListener("abort", () => xhr.abort());
+    xhr.open("PUT", part.url);
+    xhr.send(part.blob);
+  });
+}

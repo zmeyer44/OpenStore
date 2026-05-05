@@ -1,5 +1,5 @@
 import { defineBackground } from "wxt/utils/define-background";
-import { onMessage } from "../utils/messaging";
+import { onMessage, type InitiateUploadResponse } from "../utils/messaging";
 import {
   blobToBase64,
   downloadAsBlob,
@@ -212,6 +212,78 @@ export default defineBackground(() => {
       return { ok: true as const, data: res };
     } catch (err) {
       const e = err as Error & { status?: number };
+      if (e.status === 401) await setSignedIn(false);
+      return { ok: false as const, error: e.message, status: e.status };
+    }
+  });
+
+  onMessage("checkUploadConflicts", async ({ data }) => {
+    try {
+      const result = await trpcQuery<
+        { id: string; name: string; size: number }[]
+      >(
+        "uploads.checkConflicts",
+        { folderId: data.folderId, fileNames: data.fileNames },
+        { workspaceSlug: data.workspaceSlug },
+      );
+      return { ok: true as const, data: result };
+    } catch (err) {
+      const e = err as TrpcError;
+      if (e.status === 401) await setSignedIn(false);
+      return { ok: false as const, error: e.message, status: e.status };
+    }
+  });
+
+  onMessage("initiateUpload", async ({ data }) => {
+    try {
+      const result = await trpcMutation<InitiateUploadResponse>(
+        "uploads.initiate",
+        {
+          fileName: data.fileName,
+          fileSize: data.fileSize,
+          contentType: data.contentType,
+          folderId: data.folderId,
+          conflictResolution: data.conflictResolution,
+        },
+        { workspaceSlug: data.workspaceSlug },
+      );
+      return { ok: true as const, data: result };
+    } catch (err) {
+      const e = err as TrpcError;
+      if (e.status === 401) await setSignedIn(false);
+      return { ok: false as const, error: e.message, status: e.status };
+    }
+  });
+
+  onMessage("completeUpload", async ({ data }) => {
+    try {
+      await trpcMutation<unknown>(
+        "uploads.complete",
+        {
+          fileId: data.fileId,
+          uploadId: data.uploadId,
+          parts: data.parts,
+        },
+        { workspaceSlug: data.workspaceSlug },
+      );
+      return { ok: true as const, data: true as const };
+    } catch (err) {
+      const e = err as TrpcError;
+      if (e.status === 401) await setSignedIn(false);
+      return { ok: false as const, error: e.message, status: e.status };
+    }
+  });
+
+  onMessage("abortUpload", async ({ data }) => {
+    try {
+      await trpcMutation<unknown>(
+        "uploads.abort",
+        { fileId: data.fileId, uploadId: data.uploadId },
+        { workspaceSlug: data.workspaceSlug },
+      );
+      return { ok: true as const, data: true as const };
+    } catch (err) {
+      const e = err as TrpcError;
       if (e.status === 401) await setSignedIn(false);
       return { ok: false as const, error: e.message, status: e.status };
     }
