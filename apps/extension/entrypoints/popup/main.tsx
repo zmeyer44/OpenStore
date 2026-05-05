@@ -1,13 +1,30 @@
 import { createRoot } from "react-dom/client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { sendMessage } from "../../utils/messaging";
 import { webHost } from "../../utils/web-host";
 import { PRIVACY_POLICY_URL } from "../../utils/constants";
 import { FileBrowser } from "../../components/FileBrowser";
 import { Logo } from "../../components/Logo";
+import { UploadView } from "../../components/UploadView";
+import { DropOverlay } from "../../components/DropOverlay";
+
+interface BrowserContext {
+  workspaceSlug: string;
+  folderId: string | null;
+}
 
 function Popup() {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [view, setView] = useState<"browse" | "upload">("browse");
+  // Mirrors whatever folder/workspace the FileBrowser is currently on so a
+  // drop or button click routes uploads to the right place. Null until the
+  // browser has resolved a workspace.
+  const [browserCtx, setBrowserCtx] = useState<BrowserContext | null>(null);
+  const [uploadInitialFiles, setUploadInitialFiles] = useState<File[]>([]);
+  // Bumped after a successful upload to force FileBrowser to refetch the
+  // current folder. Without this the browser would show the pre-upload
+  // listing until the user navigates somewhere else and back.
+  const [refreshSignal, setRefreshSignal] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,6 +46,34 @@ function Popup() {
       cancelled = true;
       chrome.runtime.onMessage.removeListener(handler);
     };
+  }, []);
+
+  const handleContextChange = useCallback((ctx: BrowserContext) => {
+    setBrowserCtx(ctx);
+  }, []);
+
+  const handleUploadClick = useCallback(() => {
+    if (!browserCtx) return;
+    setUploadInitialFiles([]);
+    setView("upload");
+  }, [browserCtx]);
+
+  const handleFilesDropped = useCallback(
+    (files: File[]) => {
+      if (!browserCtx) return;
+      setUploadInitialFiles(files);
+      setView("upload");
+    },
+    [browserCtx],
+  );
+
+  const handleUploadClose = useCallback(() => {
+    setView("browse");
+    setUploadInitialFiles([]);
+  }, []);
+
+  const handleUploaded = useCallback(() => {
+    setRefreshSignal((n) => n + 1);
   }, []);
 
   const signIn = () => {
@@ -71,11 +116,36 @@ function Popup() {
   return (
     <div style={styles.container}>
       <Header />
-      <FileBrowser mode="browse" />
+      {/* Keep FileBrowser mounted while UploadView is showing so navigation
+          state (active workspace, current folder, breadcrumbs) survives a
+          round trip through the upload flow. */}
+      <div style={view === "upload" ? styles.hidden : undefined}>
+        <FileBrowser
+          mode="browse"
+          onContextChange={handleContextChange}
+          onUpload={handleUploadClick}
+          refreshSignal={refreshSignal}
+        />
+      </div>
+      {view === "upload" && browserCtx ? (
+        <UploadView
+          workspaceSlug={browserCtx.workspaceSlug}
+          folderId={browserCtx.folderId}
+          initialFiles={uploadInitialFiles}
+          onClose={handleUploadClose}
+          onUploaded={handleUploaded}
+        />
+      ) : null}
       <button style={styles.secondaryButton} onClick={signOut}>
         Sign out
       </button>
       <Footer />
+      {/* Drop overlay is mounted only while browsing — UploadView has its own
+          "Add files" affordance and we don't want a second drop target
+          competing with it. */}
+      {view === "browse" ? (
+        <DropOverlay onFilesDropped={handleFilesDropped} />
+      ) : null}
     </div>
   );
 }
@@ -112,6 +182,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "column",
     gap: 12,
   },
+  hidden: { display: "none" },
   header: { display: "flex", alignItems: "center", gap: 8 },
   logoMark: { width: 22, height: 22, color: "#3a62f5", flex: "0 0 auto" },
   logo: { fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em" },

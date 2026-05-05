@@ -9,6 +9,7 @@ import {
   Archive,
   ArrowLeft,
   Loader2,
+  Upload,
 } from "lucide-react";
 import {
   sendMessage,
@@ -33,6 +34,18 @@ export interface FileBrowserProps {
   // HTML5 input.accept tokens — narrow the file list to types the page
   // accepts. Forwarded to the server-side files.list query.
   accept?: string[];
+  // Lets the host track the "current location" so it can route uploads to
+  // the right workspace + folder without owning the navigation state itself.
+  onContextChange?: (ctx: {
+    workspaceSlug: string;
+    folderId: string | null;
+  }) => void;
+  // Render an "Upload" affordance in browse mode and call this when clicked.
+  // Host owns the upload UI itself; we just surface the trigger.
+  onUpload?: () => void;
+  // Bump to force a refetch — used after a host-driven action (e.g. an
+  // upload) mutates the current folder while we're showing it.
+  refreshSignal?: number;
 }
 
 function fileIcon(mimeType: string, size = 16) {
@@ -61,6 +74,9 @@ export function FileBrowser({
   onClose,
   height = 360,
   accept,
+  onContextChange,
+  onUpload,
+  refreshSignal,
 }: FileBrowserProps) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
@@ -130,7 +146,17 @@ export function FileBrowser({
     };
     // Stringify accept so a new array literal from the parent on each render
     // doesn't refire the query — only a token-set change should.
-  }, [activeSlug, folderId, accept ? accept.join("|") : null]);
+    // refreshSignal is included so the host can force a refetch (e.g. after
+    // an upload) without us tracking that mutation ourselves.
+  }, [activeSlug, folderId, accept ? accept.join("|") : null, refreshSignal]);
+
+  // Bubble (slug, folder) up so the host can route uploads to wherever the
+  // user is currently browsing. Fires whenever either changes — including the
+  // initial slug resolution after listWorkspaces returns.
+  useEffect(() => {
+    if (!onContextChange || !activeSlug) return;
+    onContextChange({ workspaceSlug: activeSlug, folderId });
+  }, [activeSlug, folderId, onContextChange]);
 
   const switchWorkspace = async (slug: string) => {
     setActiveSlug(slug);
@@ -181,6 +207,18 @@ export function FileBrowser({
           }
           disabled={workspaces.length === 0}
         />
+        {mode === "browse" && onUpload ? (
+          <button
+            type="button"
+            style={styles.uploadBtn}
+            onClick={onUpload}
+            disabled={!activeSlug}
+            aria-label="Upload files"
+            title="Upload files"
+          >
+            <Upload size={14} />
+          </button>
+        ) : null}
       </div>
 
       <div style={styles.breadcrumbRow}>
@@ -264,6 +302,20 @@ const styles: Record<string, React.CSSProperties> = {
       "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
   },
   workspaceRow: { display: "flex", alignItems: "center", gap: 8 },
+  uploadBtn: {
+    width: 36,
+    height: 36,
+    flex: "0 0 auto",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#3a62f5",
+    color: "#fff",
+    border: "none",
+    borderRadius: 9999,
+    cursor: "pointer",
+    fontFamily: "inherit",
+  },
   backBtn: {
     width: 36,
     height: 36,

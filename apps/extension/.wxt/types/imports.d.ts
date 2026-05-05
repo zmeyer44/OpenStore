@@ -3,6 +3,7 @@ export {}
 declare global {
   const ContentScriptContext: typeof import('wxt/utils/content-script-context').ContentScriptContext
   const DrawCanvas: typeof import('/Users/claudius/openstore/apps/extension/components/DrawCanvas').default
+  const DropOverlay: typeof import('/Users/claudius/openstore/apps/extension/components/DropOverlay').DropOverlay
   const FileBrowser: typeof import('/Users/claudius/openstore/apps/extension/components/FileBrowser').FileBrowser
   const GenerateView: typeof import('/Users/claudius/openstore/apps/extension/components/GenerateView').GenerateView
   const InvalidMatchPattern: typeof import('wxt/utils/match-patterns').InvalidMatchPattern
@@ -11,6 +12,9 @@ declare global {
   const PRIVACY_POLICY_URL: typeof import('/Users/claudius/openstore/apps/extension/utils/constants').PRIVACY_POLICY_URL
   const Select: typeof import('/Users/claudius/openstore/apps/extension/components/Select').Select
   const TrpcError: typeof import('/Users/claudius/openstore/apps/extension/utils/api').TrpcError
+  const UPLOAD_MAX_FILE_SIZE: typeof import('/Users/claudius/openstore/apps/extension/utils/api').UPLOAD_MAX_FILE_SIZE
+  const UPLOAD_MULTIPART_PART_SIZE: typeof import('/Users/claudius/openstore/apps/extension/utils/api').UPLOAD_MULTIPART_PART_SIZE
+  const UploadView: typeof import('/Users/claudius/openstore/apps/extension/components/UploadView').UploadView
   const activeWorkspaceSlugStore: typeof import('/Users/claudius/openstore/apps/extension/utils/storage').activeWorkspaceSlugStore
   const blobToBase64: typeof import('/Users/claudius/openstore/apps/extension/utils/api').blobToBase64
   const browser: typeof import('wxt/browser').browser
@@ -38,6 +42,9 @@ declare global {
   const storage: typeof import('wxt/utils/storage').storage
   const trpcMutation: typeof import('/Users/claudius/openstore/apps/extension/utils/api').trpcMutation
   const trpcQuery: typeof import('/Users/claudius/openstore/apps/extension/utils/api').trpcQuery
+  const uploadMultipart: typeof import('/Users/claudius/openstore/apps/extension/utils/api').uploadMultipart
+  const uploadPresignedPut: typeof import('/Users/claudius/openstore/apps/extension/utils/api').uploadPresignedPut
+  const uploadServerBuffered: typeof import('/Users/claudius/openstore/apps/extension/utils/api').uploadServerBuffered
   const useAppConfig: typeof import('wxt/utils/app-config').useAppConfig
   const useCallback: typeof import('react').useCallback
   const useContext: typeof import('react').useContext
@@ -84,9 +91,9 @@ declare global {
   export type { SelectOption, SelectProps } from '/Users/claudius/openstore/apps/extension/components/Select'
   import('/Users/claudius/openstore/apps/extension/components/Select')
   // @ts-ignore
-  export type { TrpcError } from '/Users/claudius/openstore/apps/extension/utils/api'
+  export type { TrpcError, UploadProgress, MultipartPart } from '/Users/claudius/openstore/apps/extension/utils/api'
   import('/Users/claudius/openstore/apps/extension/utils/api')
   // @ts-ignore
-  export type { Workspace, FolderRow, FileRow, Breadcrumb, ApiResult, GenerationTypeRow } from '/Users/claudius/openstore/apps/extension/utils/messaging'
+  export type { Workspace, FolderRow, FileRow, Breadcrumb, ApiResult, InitiateUploadResponse, GenerationTypeRow } from '/Users/claudius/openstore/apps/extension/utils/messaging'
   import('/Users/claudius/openstore/apps/extension/utils/messaging')
 }

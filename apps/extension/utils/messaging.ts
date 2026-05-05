@@ -82,7 +82,63 @@ interface ProtocolMap {
     size: number;
     dataBase64: string;
   }>;
+
+  // ── Upload flow ─────────────────────────────────────────────────────────
+  // tRPC initiate / complete / abort proxy through the background so cookie
+  // handling and 401 recovery sit in one place. The actual blob transfer
+  // (presigned PUT, multipart parts, or the streaming endpoint) happens in
+  // the popup itself — sending megabytes through chrome.runtime messaging
+  // would force structured-clone serialization of the whole File on every
+  // send.
+  checkUploadConflicts(data: {
+    workspaceSlug: string;
+    folderId: string | null;
+    fileNames: string[];
+  }): ApiResult<{ id: string; name: string; size: number }[]>;
+
+  initiateUpload(data: {
+    workspaceSlug: string;
+    folderId: string | null;
+    fileName: string;
+    fileSize: number;
+    contentType: string;
+    conflictResolution?: "replace" | "keep-both";
+  }): ApiResult<InitiateUploadResponse>;
+
+  completeUpload(data: {
+    workspaceSlug: string;
+    fileId: string;
+    uploadId?: string;
+    parts?: { partNumber: number; etag: string }[];
+  }): ApiResult<true>;
+
+  abortUpload(data: {
+    workspaceSlug: string;
+    fileId: string;
+    uploadId?: string;
+  }): ApiResult<true>;
 }
+
+export type InitiateUploadResponse =
+  | {
+      strategy: "server-buffered";
+      fileId: string;
+      storagePath: string;
+    }
+  | {
+      strategy: "presigned-put";
+      fileId: string;
+      storagePath: string;
+      presignedUrl: string;
+    }
+  | {
+      strategy: "multipart";
+      fileId: string;
+      storagePath: string;
+      uploadId: string;
+      partSize: number;
+      parts: { partNumber: number; url: string }[];
+    };
 
 export interface GenerationTypeRow {
   id: string;
