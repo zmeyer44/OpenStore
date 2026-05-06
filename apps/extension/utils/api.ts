@@ -167,6 +167,10 @@ export async function uploadPresignedPut(
       else reject(new Error(`Upload failed: ${xhr.status}`));
     };
     xhr.onerror = () => reject(new Error("Network error"));
+    // xhr.abort() fires the abort event, not error/load — without this the
+    // wrapping Promise would hang when cancellation comes in via signal.
+    xhr.onabort = () =>
+      reject(new DOMException("Upload cancelled", "AbortError"));
     if (signal) signal.addEventListener("abort", () => xhr.abort());
     xhr.open("PUT", presignedUrl);
     xhr.setRequestHeader(
@@ -208,6 +212,8 @@ export async function uploadServerBuffered(
       }
     };
     xhr.onerror = () => reject(new Error("Network error"));
+    xhr.onabort = () =>
+      reject(new DOMException("Upload cancelled", "AbortError"));
     xhr.withCredentials = true;
     if (signal) signal.addEventListener("abort", () => xhr.abort());
     xhr.open("PUT", `${webHost()}/api/upload/stream`);
@@ -331,6 +337,8 @@ function doPartUpload(
     };
     xhr.onerror = () =>
       reject(new Error(`Network error on part ${part.partNumber}`));
+    xhr.onabort = () =>
+      reject(new DOMException("Upload cancelled", "AbortError"));
     if (signal) signal.addEventListener("abort", () => xhr.abort());
     xhr.open("PUT", part.url);
     xhr.send(part.blob);
