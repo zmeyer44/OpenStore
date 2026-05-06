@@ -288,7 +288,13 @@ export function UploadView({
         successCountRef.current += 1;
         updateEntry(entry.id, { status: "done", progress: 100 });
       } catch (err) {
-        if (controller.signal.aborted) break;
+        if (controller.signal.aborted) {
+          // Roll the active row back to pending so its progress bar clears
+          // and the Upload button reappears for retry. Without this the row
+          // is stranded in "uploading" with no remove affordance.
+          updateEntry(entry.id, { status: "pending", progress: undefined });
+          break;
+        }
         failures += 1;
         const message = err instanceof Error ? err.message : "Upload failed";
         updateEntry(entry.id, { status: "error", error: message });
