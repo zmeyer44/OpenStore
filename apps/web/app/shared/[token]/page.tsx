@@ -54,25 +54,50 @@ export default function SharedPage({
   );
 
   const getDownloadUrl = trpc.shares.getDownloadUrl.useMutation();
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+
+  const downloadFile = async (fileId?: string) => {
+    const result = await getDownloadUrl.mutateAsync({
+      token,
+      fileId,
+      password: enteredPassword,
+    });
+    const response = await fetch(result.url);
+    if (!response.ok) throw new Error(`Download failed (${response.status})`);
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = result.filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+  };
 
   const handleDownload = async (fileId?: string) => {
     try {
-      const result = await getDownloadUrl.mutateAsync({
-        token,
-        fileId,
-        password: enteredPassword,
-      });
-      const response = await fetch(result.url);
-      if (!response.ok) throw new Error(`Download failed (${response.status})`);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = result.filename;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      await downloadFile(fileId);
     } catch (err) {
       toast.error((err as Error).message);
+    }
+  };
+
+  const handleDownloadAll = async (files: { id: string }[]) => {
+    setIsDownloadingAll(true);
+    let failed = 0;
+    // Sequential: each file consumes one of the link's maxDownloads budget,
+    // and parallel blob clicks get throttled by the browser.
+    for (const file of files) {
+      try {
+        await downloadFile(file.id);
+      } catch {
+        failed++;
+      }
+    }
+    setIsDownloadingAll(false);
+    if (failed > 0) {
+      toast.error(
+        `${failed} of ${files.length} ${failed === 1 ? "file" : "files"} failed to download`,
+      );
     }
   };
 
@@ -230,6 +255,21 @@ export default function SharedPage({
                 </div>
               ))}
             </div>
+
+            {displayFiles && displayFiles.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                disabled={isDownloadingAll}
+                onClick={() => handleDownloadAll(displayFiles)}
+              >
+                <Download className="size-3.5" />
+                {isDownloadingAll
+                  ? "Downloading…"
+                  : `Download all (${displayFiles.length})`}
+              </Button>
+            )}
 
             {browseQuery.isLoading && isBrowsing ? (
               <div className="border rounded-sm p-6 text-center">
