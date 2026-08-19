@@ -525,6 +525,8 @@ export function PDFViewer({
   }, [url, onLoadSuccess, onLoadError]);
 
   /* ---- Observe container width ---- */
+  // Re-run when loading finishes: the scroll container only exists once the
+  // loading skeleton is replaced, so a mount-only effect would never attach.
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -536,7 +538,7 @@ export function PDFViewer({
     });
     observer.observe(container);
     return () => observer.disconnect();
-  }, []);
+  }, [isLoading]);
 
   /* ---- Observe visible pages ---- */
   useEffect(() => {
@@ -612,17 +614,11 @@ export function PDFViewer({
     [pages.length, scrollToPage, onPageChangeProp],
   );
 
-  /* ---- Auto-scale on load ---- */
-  useEffect(() => {
-    if (pages.length === 0 || !containerWidth) return;
-    const firstPage = pages[0];
-    if (!firstPage) return;
-    const viewport = firstPage.getViewport({ scale: 1 });
-    const fitScale = (containerWidth - 48) / viewport.width;
-    if (fitScale < 1) setScale(fitScale);
-  }, [pages, containerWidth]);
-
   /* ---- Zoom handlers ---- */
+  // PDFPage renders at scale * min(pageFitScale, 1), so pages wider than the
+  // container (e.g. landscape) already fit the full width at scale 1 — no
+  // auto-scale on load needed, and the fit handlers below must divide that
+  // clamp back out to hit an exact target scale.
   const handleScaleChange = useCallback((s: number) => {
     setScale(Math.max(MIN_SCALE, Math.min(MAX_SCALE, s)));
   }, []);
@@ -632,7 +628,8 @@ export function PDFViewer({
     const firstPage = pages[0];
     if (!firstPage) return;
     const vp = firstPage.getViewport({ scale: 1 });
-    setScale((containerWidth - 48) / vp.width);
+    const fitScale = (containerWidth - 48) / vp.width;
+    setScale(Math.max(fitScale, 1));
   }, [pages, containerWidth]);
 
   const handleFitPage = useCallback(() => {
@@ -645,7 +642,7 @@ export function PDFViewer({
     const containerHeight = container.clientHeight - PAGE_GAP * 2;
     const widthScale = (containerWidth - 48) / vp.width;
     const heightScale = containerHeight / vp.height;
-    setScale(Math.min(widthScale, heightScale));
+    setScale(Math.min(widthScale, heightScale) / Math.min(widthScale, 1));
   }, [pages, containerWidth]);
 
   /* ---- Keyboard navigation ---- */
