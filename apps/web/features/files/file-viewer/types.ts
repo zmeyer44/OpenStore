@@ -4,6 +4,7 @@ export type ViewerType =
   | "audio"
   | "pdf"
   | "docx"
+  | "xlsx"
   | "markdown"
   | "csv"
   | "html"

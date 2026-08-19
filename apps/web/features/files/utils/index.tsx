@@ -62,6 +62,14 @@ export function getViewerType(mimeType: string, name: string): ViewerType {
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
   )
     return "docx";
+  if (
+    ext === "xlsx" ||
+    ext === "xls" ||
+    mimeType ===
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    mimeType === "application/vnd.ms-excel"
+  )
+    return "xlsx";
   if (ext === "md" || ext === "mdx" || mimeType === "text/markdown")
     return "markdown";
   if (ext === "csv" || mimeType === "text/csv") return "csv";

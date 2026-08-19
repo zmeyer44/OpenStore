@@ -5,6 +5,7 @@ import { VideoPreview } from "./video-preview";
 import { AudioPreview } from "./audio-preview";
 import { PdfPreview } from "./pdf-preview";
 import { DocxPreview } from "./docx-preview";
+import { XlsxPreview } from "./xlsx-preview";
 import { MarkdownPreview } from "./markdown-preview";
 import { TextPreview } from "./text-preview";
 import { CsvPreview } from "./csv-preview";
@@ -45,6 +46,8 @@ export function PreviewArea({
       return <PdfPreview url={previewUrl} />;
     case "docx":
       return <DocxPreview url={previewUrl} />;
+    case "xlsx":
+      return <XlsxPreview url={previewUrl} name={file.name} />;
     case "markdown":
       return <MarkdownPreview content={textContent} name={file.name} />;
     case "csv":
