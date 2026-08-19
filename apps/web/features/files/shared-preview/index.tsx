@@ -54,23 +54,26 @@ export function SharedFilePreview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (error) {
-    return (
-      <div className="rounded-lg border bg-muted/30 flex flex-col items-center justify-center min-h-[40vh] gap-2 p-8 text-center">
-        <AlertCircle className="h-6 w-6 text-red-400" />
-        <p className="text-sm text-muted-foreground">{error}</p>
-      </div>
-    );
-  }
-
+  // Fixed height so the page doesn't jump as the loader is swapped for the
+  // rendered document; [&>div]:h-full gives the preview roots a height
+  // context, matching the in-app viewer's layout.
   return (
-    <PreviewArea
-      viewerType={getViewerType(file.mimeType, file.name)}
-      previewUrl={previewUrl}
-      textContent={textContent}
-      file={file}
-      loading={loading}
-      onDownload={onDownload}
-    />
+    <div className="h-[70vh] [&>div]:h-full">
+      {error ? (
+        <div className="rounded-lg border bg-muted/30 flex flex-col items-center justify-center gap-2 p-8 text-center">
+          <AlertCircle className="h-6 w-6 text-red-400" />
+          <p className="text-sm text-muted-foreground">{error}</p>
+        </div>
+      ) : (
+        <PreviewArea
+          viewerType={getViewerType(file.mimeType, file.name)}
+          previewUrl={previewUrl}
+          textContent={textContent}
+          file={file}
+          loading={loading}
+          onDownload={onDownload}
+        />
+      )}
+    </div>
   );
 }
