@@ -8,10 +8,12 @@ import {
   Folder,
   Mail,
   ChevronRight,
+  ArrowLeft,
 } from "lucide-react";
 import { Logo } from "@/assets/logo";
 import { trpc } from "@/lib/trpc/client";
-import { formatBytes } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
+import { SharedFilePreview } from "@/features/files/shared-preview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FileIcon } from "@/components/file-icon";
@@ -39,6 +41,12 @@ export default function TrackedLinkPage({
   const eventIdRef = useRef<string | null>(null);
   const startTimeRef = useRef<number>(Date.now());
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<{
+    fileId?: string;
+    name: string;
+    mimeType: string;
+    size: number;
+  } | null>(null);
 
   const { data, isLoading } = trpc.trackedLinks.access.useQuery({
     token,
@@ -57,6 +65,7 @@ export default function TrackedLinkPage({
   );
 
   const getDownloadUrl = trpc.trackedLinks.getDownloadUrl.useMutation();
+  const getPreviewUrl = trpc.trackedLinks.getPreviewUrl.useMutation();
 
   // Send tracking beacon when access succeeds
   const sendTrackingBeacon = useCallback(async () => {
@@ -279,7 +288,12 @@ export default function TrackedLinkPage({
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
-      <div className="w-full max-w-md rounded-lg border bg-card p-6">
+      <div
+        className={cn(
+          "w-full rounded-lg border bg-card p-6",
+          previewFile ? "max-w-3xl" : "max-w-md",
+        )}
+      >
         <div className="flex items-center gap-2 mb-6">
           <Logo className="size-5 text-primary" />
           <span className="title text-base">Locker</span>
@@ -288,9 +302,63 @@ export default function TrackedLinkPage({
           </span>
         </div>
 
-        {item.type === "file" ? (
+        {previewFile ? (
           <div className="space-y-4">
-            <div className="flex items-center gap-3 p-3 bg-background rounded-sm border">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setPreviewFile(null)}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
+              >
+                <ArrowLeft className="size-4" />
+                Back
+              </button>
+              <p className="text-sm font-medium text-foreground truncate flex-1">
+                {previewFile.name}
+              </p>
+              {access === "download" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleDownload(previewFile.fileId)}
+                >
+                  <Download className="size-3.5" />
+                  Download
+                </Button>
+              )}
+            </div>
+
+            <SharedFilePreview
+              key={previewFile.fileId ?? "root"}
+              file={previewFile}
+              fetchUrl={() =>
+                getPreviewUrl
+                  .mutateAsync({
+                    token,
+                    fileId: previewFile.fileId,
+                    password: enteredPassword,
+                    email: enteredEmail,
+                  })
+                  .then((r) => r.url)
+              }
+              onDownload={
+                access === "download"
+                  ? () => handleDownload(previewFile.fileId)
+                  : undefined
+              }
+            />
+          </div>
+        ) : item.type === "file" ? (
+          <div className="space-y-4">
+            <button
+              onClick={() =>
+                setPreviewFile({
+                  name: item.name,
+                  mimeType: item.mimeType ?? "",
+                  size: item.size ?? 0,
+                })
+              }
+              className="flex items-center gap-3 p-3 w-full text-left bg-background rounded-sm border hover:bg-accent/50 cursor-pointer"
+            >
               <FileIcon
                 name={item.name}
                 mimeType={item.mimeType}
@@ -304,7 +372,8 @@ export default function TrackedLinkPage({
                   {formatBytes(item.size ?? 0)}
                 </p>
               </div>
-            </div>
+              <ChevronRight className="size-3.5 text-muted-foreground shrink-0" />
+            </button>
 
             {access === "download" && (
               <Button className="w-full" onClick={() => handleDownload()}>
@@ -374,16 +443,28 @@ export default function TrackedLinkPage({
                 {displayFiles?.map((file) => (
                   <div
                     key={file.id}
-                    className="flex items-center gap-2.5 px-3 py-2"
+                    className="flex items-center gap-2.5 px-3 py-2 hover:bg-accent/50"
                   >
-                    <FileIcon
-                      name={file.name}
-                      mimeType={file.mimeType}
-                      className="h-4 w-4 shrink-0"
-                    />
-                    <span className="text-sm text-foreground truncate flex-1">
-                      {file.name}
-                    </span>
+                    <button
+                      onClick={() =>
+                        setPreviewFile({
+                          fileId: file.id,
+                          name: file.name,
+                          mimeType: file.mimeType,
+                          size: file.size,
+                        })
+                      }
+                      className="flex items-center gap-2.5 flex-1 min-w-0 text-left cursor-pointer"
+                    >
+                      <FileIcon
+                        name={file.name}
+                        mimeType={file.mimeType}
+                        className="h-4 w-4 shrink-0"
+                      />
+                      <span className="text-sm text-foreground truncate flex-1">
+                        {file.name}
+                      </span>
+                    </button>
                     <span className="text-xs font-medium text-muted-foreground">
                       {formatBytes(file.size)}
                     </span>

@@ -24,7 +24,7 @@ export function PreviewArea({
   textContent: string | null;
   file: { name: string; mimeType: string; size: number };
   loading: boolean;
-  onDownload: () => void;
+  onDownload?: () => void;
 }) {
   if (loading) {
     return (
