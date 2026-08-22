@@ -13,6 +13,17 @@ export function formatBytes(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
+export function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 1) return "<1s";
+  const total = Math.round(seconds);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  if (minutes > 0) return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`;
+  return `${secs}s`;
+}
+
 export function formatDate(date: Date | string): string {
   return new Date(date).toLocaleDateString("en-US", {
     month: "short",
