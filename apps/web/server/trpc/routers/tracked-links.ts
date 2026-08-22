@@ -610,6 +610,90 @@ export const trackedLinksRouter = createRouter({
       };
     }),
 
+  // Public: signed URL for rendering a preview (allowed for both "view" and
+  // "download" access; does not count as a download)
+  getPreviewUrl: publicProcedure
+    .input(
+      z.object({
+        token: z.string(),
+        fileId: z.string().uuid().optional(),
+        password: z.string().optional(),
+        email: z.string().email().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [link] = await ctx.db
+        .select()
+        .from(trackedLinks)
+        .where(eq(trackedLinks.token, input.token));
+
+      if (!link || !link.isActive) throw new Error("Link not found");
+      if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
+        throw new Error("Link expired");
+      }
+      if (link.validFrom && new Date(link.validFrom) > new Date()) {
+        throw new Error("Link is not yet active");
+      }
+      if (link.validUntil && new Date(link.validUntil) < new Date()) {
+        throw new Error("Link is no longer active");
+      }
+      if (link.maxViews && link.viewCount >= link.maxViews) {
+        throw new Error("View limit reached");
+      }
+      if (link.requireEmail && !input.email) {
+        throw new Error("Email required");
+      }
+      if (
+        link.hasPassword &&
+        !verifyLinkPassword(input.password, link.passwordHash)
+      ) {
+        throw new Error("Incorrect password");
+      }
+
+      let fileId: string;
+      if (link.fileId) {
+        if (input.fileId && input.fileId !== link.fileId) {
+          throw new Error("File not found");
+        }
+        fileId = link.fileId;
+      } else if (link.folderId) {
+        if (!input.fileId) throw new Error("No file specified");
+        fileId = input.fileId;
+      } else {
+        throw new Error("Link target not found");
+      }
+
+      const [targetFile] = await ctx.db
+        .select()
+        .from(files)
+        .where(
+          and(
+            eq(files.id, fileId),
+            eq(files.workspaceId, link.workspaceId),
+            eq(files.status, "ready"),
+          ),
+        );
+      if (!targetFile) throw new Error("File not found");
+
+      // For folder shares, verify the file lives inside the shared folder tree
+      if (link.folderId) {
+        if (!targetFile.folderId) throw new Error("File not found");
+        const allowed = await isDescendantFolder(
+          ctx.db,
+          targetFile.folderId,
+          link.folderId,
+        );
+        if (!allowed) throw new Error("File not found");
+      }
+
+      const storage = await createStorageForFile(targetFile.id);
+      const url = await storage.getSignedUrl(
+        await getFileStoragePath(targetFile.id),
+        3600,
+      );
+      return { url, filename: targetFile.name };
+    }),
+
   getDownloadUrl: publicProcedure
     .input(
       z.object({

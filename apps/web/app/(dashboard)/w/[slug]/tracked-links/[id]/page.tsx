@@ -23,7 +23,7 @@ import {
   Mail,
 } from 'lucide-react';
 import { trpc } from '@/lib/trpc/client';
-import { formatDate, getRelativeTime } from '@/lib/utils';
+import { formatDate, formatDuration, getRelativeTime } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { FileIcon } from '@/components/file-icon';
@@ -314,7 +314,7 @@ export default function TrackedLinkDetailPage({
             label="Avg. Duration"
             value={
               analytics?.avgDurationSeconds != null
-                ? `${analytics.avgDurationSeconds}s`
+                ? formatDuration(analytics.avgDurationSeconds)
                 : '--'
             }
             sub={

@@ -8,7 +8,7 @@ export function UnsupportedPreview({
   onDownload,
 }: {
   file: { name: string; mimeType: string; size: number };
-  onDownload: () => void;
+  onDownload?: () => void;
 }) {
   return (
     <div className="rounded-lg border bg-muted/30 flex flex-col items-center justify-center min-h-[50vh] gap-4 p-8 text-center">
@@ -28,10 +28,12 @@ export function UnsupportedPreview({
           {formatBytes(file.size)}
         </p>
       </div>
-      <Button size="sm" onClick={onDownload}>
-        <Download className="size-4" />
-        Download to view
-      </Button>
+      {onDownload && (
+        <Button size="sm" onClick={onDownload}>
+          <Download className="size-4" />
+          Download to view
+        </Button>
+      )}
     </div>
   );
 }
